@@ -10,7 +10,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#define	FPACK_VERSION	"0.9.6 (April 2008)"
+#define	FPACK_VERSION	"1.0.0 (June 2008)"
 #define	FP_INIT_MAGIC	42
 #define	FPACK		0
 #define	FUNPACK		1

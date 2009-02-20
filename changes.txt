@@ -1,6 +1,32 @@
                    Log of Changes Made to CFITSIO
 
-Version 3.08 - 15 April 2008 (internal release)
+Version 3.09 - 12 June 2008
+
+   - fixed bug in the calculator function, parse_data, that evaluates 
+     expressions then selecting rows or modifying values in table columns.
+     This bug only appeared in unusual circumstances
+     where the calculated value has a null value (= TNULLn).  The bug
+     could cause elements to not be flagged as having a null value, or
+     in rare cases could cause valid elements to be flagged as null. This
+     only appears to have affected 64-bit platforms (where size(long) = 8).
+   
+   - fixed typo in imcomp_decompress_tile: call to fffi2r8 should have 
+     been to fffi4r8.
+     
+   - in the imcopy_copy_comp2img routine, moved the call to 
+     fits_translate_keywords outside of the 'if' statement.  This could 
+     affect reading compressed images that did not have a EXTNAME keyword
+     in the header.
+     
+   - fixed imcomp_compress_tile in imcompress.c to properly support
+     writing unsigned integers, in place, to tile compressed images.
+
+   - modified fits_read_compressed_img so that if the calling routine
+     specifies nullval = 0, then it will not check for null-valued
+     pixels in the compressed FITS image.  This mimics the same
+     behavior when reading normal uncompressed FITS images.
+
+Version 3.08 - 15 April 2008 
 
    - fixed backwards compatibility issue when uncompressing a Rice
      compressed image that was created with previous versions of 
