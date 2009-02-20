@@ -399,7 +399,7 @@ int imcomp_init_table(fitsfile *outfptr,
 */
 {
     char keyname[FLEN_KEYWORD], zcmptype[12];
-    int ii, jj, minspace, tempsize, remain, leftspace, ncols, bitpix;
+    int ii,  remain,  ncols, bitpix;
     long nrows;
     char *ttype[] = {"COMPRESSED_DATA", "ZSCALE", "ZZERO"};
     char *tform[3];
@@ -421,6 +421,8 @@ int imcomp_init_table(fitsfile *outfptr,
         bitpix = inbitpix;
 
     /* reset default tile dimensions too if required */
+    long actual_tilesize[MAX_COMPRESS_DIM]; // Actual size to use for tiles
+    memcpy(actual_tilesize, outfptr->Fptr->request_tilesize, MAX_COMPRESS_DIM * sizeof(long));
 
     if ((outfptr->Fptr)->request_compress_type == HCOMPRESS_1) {
 
@@ -433,20 +435,20 @@ int imcomp_init_table(fitsfile *outfptr,
             return(*status = DATA_COMPRESSION_ERR);
          }
 
-         if (((outfptr->Fptr)->request_tilesize[0] == 0) &&
-             ((outfptr->Fptr)->request_tilesize[1] == 0) ){
+         if ((actual_tilesize[0] == 0) &&
+             (actual_tilesize[1] == 0) ){
 	     
 	    /* compress the whole image as a single tile */
-	     (outfptr->Fptr)->request_tilesize[0] = naxes[0];
-	     (outfptr->Fptr)->request_tilesize[1] = naxes[1];
+             actual_tilesize[0] = naxes[0];
+             actual_tilesize[1] = naxes[1];
 
               for (ii = 2; ii < naxis; ii++) {
 	             /* set all higher tile dimensions = 1 */
-	      	     (outfptr->Fptr)->request_tilesize[ii] = 1;
+                     actual_tilesize[ii] = 1;
 	      }
 
-         } else if (((outfptr->Fptr)->request_tilesize[0] == 0) &&
-             ((outfptr->Fptr)->request_tilesize[1] == 1) ){
+         } else if ((actual_tilesize[0] == 0) &&
+             (actual_tilesize[1] == 1) ){
 	     
              /*
               The Hcompress algorithm is inherently 2D in nature, so the row by row
@@ -461,32 +463,32 @@ int imcomp_init_table(fitsfile *outfptr,
 	     */ 
 	      
              /* 1st tile dimension is the row length of the image */
-	     (outfptr->Fptr)->request_tilesize[0] = naxes[0];
+             actual_tilesize[0] = naxes[0];
 
               if (naxes[1] <= 30) {  /* use whole image if it is small */
-                   (outfptr->Fptr)->request_tilesize[1] = naxes[1];
+                   actual_tilesize[1] = naxes[1];
 	      } else {
                 /* look for another good tile dimension */
 	          if        (naxes[1] % 16 == 0 || naxes[1] % 16 > 3) {
-		      (outfptr->Fptr)->request_tilesize[1] = 16;
+                      actual_tilesize[1] = 16;
 		  } else if (naxes[1] % 24 == 0 || naxes[1] % 24 > 3) {
- 		      (outfptr->Fptr)->request_tilesize[1] = 24;
+                      actual_tilesize[1] = 24;
 		  } else if (naxes[1] % 20 == 0 || naxes[1] % 20 > 3) {
- 		      (outfptr->Fptr)->request_tilesize[1] = 20;
+                      actual_tilesize[1] = 20;
 		  } else if (naxes[1] % 30 == 0 || naxes[1] % 30 > 3) {
- 		      (outfptr->Fptr)->request_tilesize[1] = 30;
+                      actual_tilesize[1] = 30;
 		  } else if (naxes[1] % 28 == 0 || naxes[1] % 28 > 3) {
- 		      (outfptr->Fptr)->request_tilesize[1] = 28;
+                      actual_tilesize[1] = 28;
 		  } else if (naxes[1] % 26 == 0 || naxes[1] % 26 > 3) {
- 		      (outfptr->Fptr)->request_tilesize[1] = 26;
+                      actual_tilesize[1] = 26;
 		  } else if (naxes[1] % 22 == 0 || naxes[1] % 22 > 3) {
- 		      (outfptr->Fptr)->request_tilesize[1] = 22;
+                      actual_tilesize[1] = 22;
 		  } else if (naxes[1] % 18 == 0 || naxes[1] % 18 > 3) {
- 		      (outfptr->Fptr)->request_tilesize[1] = 18;
+                      actual_tilesize[1] = 18;
 		  } else if (naxes[1] % 14 == 0 || naxes[1] % 14 > 3) {
- 		      (outfptr->Fptr)->request_tilesize[1] = 14;
+                      actual_tilesize[1] = 14;
 		  } else  {
- 		      (outfptr->Fptr)->request_tilesize[1] = 17;
+                      actual_tilesize[1] = 17;
 
 		  }
 	      }
@@ -500,7 +502,7 @@ int imcomp_init_table(fitsfile *outfptr,
 /* ****************
  	     for (ii = 0; ii < 2 && ii < naxis; ii++) {  
 	         if (naxes[ii] <= 600) {
-	             (outfptr->Fptr)->request_tilesize[ii] = naxes[ii];
+                     actual_tilesize[ii] = naxes[ii];
 	         } else {
                      minspace = naxes[ii];
 		     tempsize = naxes[ii];
@@ -521,13 +523,13 @@ tf1
 			   }
 		        }
 		    } 
- 	            (outfptr->Fptr)->request_tilesize[ii] = tempsize;
+                    actual_tilesize[ii] = tempsize;
 	        }
 	    }	  
  ************  */   	    
 
-	} else if ((outfptr->Fptr)->request_tilesize[0] < 4 || 
-	           (outfptr->Fptr)->request_tilesize[1] < 4) {
+        } else if (actual_tilesize[0] < 4 ||
+                   actual_tilesize[1] < 4) {
 
             /* user-specified tile size is too small */
             ffpmsg("Hcompress minimum tile dimension is 4 pixels (imcomp_init_table)");
@@ -535,22 +537,22 @@ tf1
 	}
 	
         /* check if requested tile size causes the last tile to to have less than 4 pixels */
-        remain = naxes[0] % ((outfptr->Fptr)->request_tilesize[0]);  /* 1st dimension */
+        remain = naxes[0] % (actual_tilesize[0]);  /* 1st dimension */
         if (remain > 0 && remain < 4) {
-	    ((outfptr->Fptr)->request_tilesize[0])++; /* try increasing tile size by 1 */
+            (actual_tilesize[0])++; /* try increasing tile size by 1 */
 	   
-            remain = naxes[0] % ((outfptr->Fptr)->request_tilesize[0]);
+            remain = naxes[0] % (actual_tilesize[0]);
             if (remain > 0 && remain < 4) {
                 ffpmsg("Last tile along 1st dimension has less than 4 pixels (imcomp_init_table)");
                 return(*status = DATA_COMPRESSION_ERR);	
             }        
         }
 
-        remain = naxes[1] % ((outfptr->Fptr)->request_tilesize[1]);  /* 2nd dimension */
+        remain = naxes[1] % (actual_tilesize[1]);  /* 2nd dimension */
         if (remain > 0 && remain < 4) {
-	    ((outfptr->Fptr)->request_tilesize[1])++; /* try increasing tile size by 1 */
+            (actual_tilesize[1])++; /* try increasing tile size by 1 */
 	   
-            remain = naxes[1] % ((outfptr->Fptr)->request_tilesize[1]);
+            remain = naxes[1] % (actual_tilesize[1]);
             if (remain > 0 && remain < 4) {
                 ffpmsg("Last tile along 2nd dimension has less than 4 pixels (imcomp_init_table)");
                 return(*status = DATA_COMPRESSION_ERR);	
@@ -559,14 +561,12 @@ tf1
 
     } /* end, if HCOMPRESS_1 */
     
-
     for (ii = 0; ii < naxis; ii++) {
-        if ((outfptr->Fptr)->request_tilesize[ii] <= 0) {
+        if (actual_tilesize[ii] <= 0) {
 	    /* tile size of 0 means use the image size of that dimension */
-	    (outfptr->Fptr)->request_tilesize[ii] = naxes[ii];
+            actual_tilesize[ii] = naxes[ii];
 	}
     }
-
 
     /* ---- set up array of TFORM strings -------------------------------*/
     strcpy(tf0, "1PB");
@@ -581,7 +581,7 @@ tf1
     nrows = 1;
     for (ii = 0; ii < naxis; ii++)
     {
-        nrows = nrows * ((naxes[ii] - 1)/ ((outfptr->Fptr)->request_tilesize[ii]) + 1);
+        nrows = nrows * ((naxes[ii] - 1)/ (actual_tilesize[ii]) + 1);
     }
 
     if (bitpix < 0 )  /* floating point image */
@@ -646,7 +646,7 @@ tf1
     for (ii = 0;  ii < naxis;  ii++)
     {
         sprintf (keyname, "ZTILE%d", ii+1);
-        ffpkyj (outfptr, keyname, (outfptr->Fptr)->request_tilesize[ii],
+        ffpkyj (outfptr, keyname, actual_tilesize[ii],
 			"size of tiles to be compressed", status);
     }
 
@@ -776,8 +776,8 @@ int imcomp_compress_image (fitsfile *infptr, fitsfile *outfptr, int *status)
 */
 {
     double *tiledata = 0;
-    int anynul, gotnulls = 0, datatype, tstatus, colnum;
-    long ii, row, nelem, offset;
+    int anynul, gotnulls = 0, datatype;
+    long ii, row;
     int naxis;
     double dummy = 0.;
     long maxtilelen, tilelen, incre[] = {1, 1, 1, 1, 1, 1};
@@ -1041,7 +1041,6 @@ int imcomp_compress_tile (fitsfile *outfptr,
     short *cbuf;	/* compressed data */
     short *sbuff;
     unsigned short *usbuff;
-    int *intbuff;
     unsigned int *uintbuff, uintflagval;
     int clen;		/* size of cbuf */
     int flag = 1; /* true by default; only = 0 if float data couldn't be quantized */
@@ -1054,8 +1053,6 @@ int imcomp_compress_tile (fitsfile *outfptr,
     LONGLONG *lldata;
     signed char *sbbuff;
     unsigned char *usbbuff;
-    long *lbuff;
-    unsigned long *ulbuff;
     int ihcompscale, cn_zblank, zbitpix, nullval, flagval = 0;
     int intlength = 4;  /* size of integers to be compressed */
     float floatnull, hcompscale;
@@ -2219,8 +2216,7 @@ int fits_write_compressed_img(fitsfile *fptr,   /* I - FITS file pointer     */
     long rowdim[MAX_COMPRESS_DIM], offset[MAX_COMPRESS_DIM],ntemp;
     long fpixel[MAX_COMPRESS_DIM], lpixel[MAX_COMPRESS_DIM];
     int ii, i5, i4, i3, i2, i1, i0, ndim, irow, pixlen, tilenul;
-    int anynull, tstatus, buffpixsiz;
-    long totpix;
+    int  tstatus, buffpixsiz;
     void *buffer;
     char *bnullarray = 0, card[FLEN_CARD];
     float floatnull = 0.;
@@ -3901,6 +3897,7 @@ int imcomp_copy_img2comp(fitsfile *infptr, fitsfile *outfptr, int *status)
 */
 {
     char card[FLEN_CARD];	/* a header record */
+    int nkeys, nmore, ii, jj;
 
     /* tile compressed image keyword translation table  */
     /*                        INPUT      OUTPUT  */
@@ -3933,13 +3930,22 @@ int imcomp_copy_img2comp(fitsfile *infptr, fitsfile *outfptr, int *status)
        fits_write_record(outfptr, card, status);
     }
 
+
+
     /* copy all the keywords from the input file to the output */
     npat = sizeof(patterns)/sizeof(patterns[0][0])/2;
     fits_translate_keywords(infptr, outfptr, 1, patterns, npat,
 			    0, 0, 0, status);
 
-    if (*status > 0)
-       return (*status);
+    ffghsp(infptr, &nkeys, &nmore, status); /* get number of keywords in image */
+
+    nmore = nmore / 36;  /* how many completely empty header blocks are there? */
+     
+     /* preserve the same number of spare header blocks in the output header */
+     
+    for (jj = 0; jj < nmore; jj++)
+       for (ii = 0; ii < 36; ii++)
+          fits_write_record(outfptr, "    ", status);
 
     return (*status);
 }
@@ -3954,7 +3960,8 @@ int imcomp_copy_comp2img(fitsfile *infptr, fitsfile *outfptr,
     char card[FLEN_CARD];	/* a header record */
     char *patterns[40][2];
     char negative[] = "-";
-    int ii, npat, nreq, nsp, tstatus = 0;
+    int ii,jj, npat, nreq, nsp, tstatus = 0;
+    int nkeys, nmore;
     
     /* tile compressed image keyword translation table  */
     /*                        INPUT      OUTPUT  */
@@ -4033,6 +4040,19 @@ int imcomp_copy_comp2img(fitsfile *infptr, fitsfile *outfptr,
     fits_translate_keywords(infptr, outfptr, 1, patterns, npat,
 			    0, 0, 0, status);
 
+
+
+    ffghsp(infptr, &nkeys, &nmore, status); /* get number of keywords in image */
+
+    nmore = nmore / 36;  /* how many completely empty header blocks are there? */
+     
+    /* preserve the same number of spare header blocks in the output header */
+     
+    for (jj = 0; jj < nmore; jj++)
+       for (ii = 0; ii < 36; ii++)
+          fits_write_record(outfptr, "    ", status);
+
+
     return (*status);
 }
 /*--------------------------------------------------------------------------*/
@@ -4069,6 +4089,7 @@ int imcomp_decompress_tile (fitsfile *infptr,
     /* **************************************************************** */
     /* check if this tile was cached; if so, just copy it out */
     if (nrow == (infptr->Fptr)->tilerow && datatype == (infptr->Fptr)->tiletype ) {
+
          memcpy(buffer, (infptr->Fptr)->tiledata, (infptr->Fptr)->tiledatasize);
 	 
 	 if (nullcheck == 2)
@@ -4304,6 +4325,7 @@ int imcomp_decompress_tile (fitsfile *infptr,
         }
 
         /* read array of compressed bytes */
+
         if (fits_read_col(infptr, TBYTE, (infptr->Fptr)->cn_compressed, nrow,
              1, nelem, &charnull, cbuf, NULL, status) > 0)
         {
