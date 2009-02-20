@@ -579,7 +579,6 @@ int ffcalc_rng( fitsfile *infptr,   /* I - Input FITS file                  */
                   ffcprs();
                   ffpmsg("Cannot create LOGICAL column in ASCII table");
                   return( *status = NOT_BTABLE );
-                  break;
                case TLONG:     strcpy(tform,"I11");     break;
                case TDOUBLE:   strcpy(tform,"D23.15");  break;
                case TSTRING:   
@@ -922,7 +921,8 @@ void ffcprs( void )  /*  No parameters                                      */
       while( node-- ) {
          if( gParse.Nodes[node].operation==gtifilt_fct ) {
             i = gParse.Nodes[node].SubNodes[0];
-            FREE( gParse.Nodes[ i ].value.data.ptr );
+            if (gParse.Nodes[ i ].value.data.ptr)
+	        FREE( gParse.Nodes[ i ].value.data.ptr );
          }
          else if( gParse.Nodes[node].operation==regfilt_fct ) {
             i = gParse.Nodes[node].SubNodes[0];
@@ -961,7 +961,7 @@ int parse_data( long    totalrows,     /* I - Total rows to be processed     */
     static void *Data, *Null;
     static int  datasize;
     static long lastRow, repeat, resDataSize;
-    LONGLONG jnull;
+    static LONGLONG jnull;
     static parseInfo *userInfo;
     static long zeros[4] = {0,0,0,0};
 
@@ -1019,7 +1019,7 @@ int parse_data( long    totalrows,     /* I - Total rows to be processed     */
           }
           repeat = outcol->repeat;
           if (DEBUG_PIXFILTER)
-            printf("using null value %ld\n", jnull);
+            printf("parse_data: using null value %ld\n", jnull);
        } else {
 
           Data = userInfo->dataPtr;
@@ -1059,6 +1059,9 @@ int parse_data( long    totalrows,     /* I - Total rows to be processed     */
 
     /*  If writing to output column, set first element to appropriate  */
     /*  null value.  If no NULLs encounter, zero out before returning. */
+          if (DEBUG_PIXFILTER)
+            printf("parse_data: using null value %ld\n", jnull);
+
 
     if( userInfo->dataPtr == NULL ) {
        /* First, reset Data pointer to start of output array */
@@ -1542,7 +1545,6 @@ int ffcvtn( int   inputType,  /* I - Data type of input array               */
             }
          }
          return( *status );
-         break;
       case TFLOAT:
          fffr4i1((float*)input,ntodo,1.,0.,0,0,NULL,NULL,
                  (unsigned char*)output,status);
@@ -1591,7 +1593,6 @@ int ffcvtn( int   inputType,  /* I - Data type of input array               */
             }
          }
          return( *status );
-         break;
       case TFLOAT:
          fffr4i2((float*)input,ntodo,1.,0.,0,0,NULL,NULL,
                  (short*)output,status);
@@ -2536,7 +2537,7 @@ int fits_pixel_filter (PixelFilter * filter, int * status)
 /*--------------------------------------------------------------------------*/
 {
    parseInfo Info = { 0 };
-   int naxis, constant, bitpix;
+   int naxis, bitpix;
    long nelem, naxes[MAXDIMS];
    int col_cnt;
    Node *result;
@@ -2566,12 +2567,10 @@ int fits_pixel_filter (PixelFilter * filter, int * status)
             &Info.datatype, &nelem, &naxis, naxes, status)) {
       goto CLEANUP;
    }
+
    if (nelem < 0) {
-      constant = 1;
       nelem = -nelem;
    }
-   else
-      constant = 0;
 
    {
       /* validate result type */

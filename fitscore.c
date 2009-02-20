@@ -60,11 +60,16 @@ float ffvers(float *version)  /* IO - version number */
   return the current version number of the FITSIO software
 */
 {
-      *version = (float) 3.08;
+      *version = (float) 3.13;
 
-/*     15 April 2008 (internal release)
+/*     5 Jan 2009 
 
    Previous releases:
+      *version = 3.12     8 Oct 2008 
+      *version = 3.11    19 Sep 2008 
+      *version = 3.10    20 Aug 2008 
+      *version = 3.09     3 Jun 2008 
+      *version = 3.08    15 Apr 2007  (internal release)
       *version = 3.07     5 Nov 2007  (internal release)
       *version = 3.06    27 Aug 2007  
       *version = 3.05    12 Jul 2007  (internal release)
@@ -832,7 +837,7 @@ int ffpxsz(int datatype)
        return(0);
 }
 /*--------------------------------------------------------------------------*/
-int fftkey(char *keyword,    /* I -  keyword name */
+int fftkey(const char *keyword,    /* I -  keyword name */
            int *status)      /* IO - error status */
 /*
   Test that the keyword name conforms to the FITS standard.  Must contain
@@ -948,9 +953,9 @@ void ffupch(char *string)
     return;
 }
 /*--------------------------------------------------------------------------*/
-int ffmkky(char *keyname,   /* I - keyword name    */
+int ffmkky(const char *keyname,   /* I - keyword name    */
             char *value,     /* I - keyword value   */
-            char *comm,      /* I - keyword comment */
+            const char *comm,      /* I - keyword comment */
             char *card,      /* O - constructed keyword card */
             int  *status)    /* IO - status value   */
 /*
@@ -960,7 +965,7 @@ int ffmkky(char *keyname,   /* I - keyword name    */
 {
     size_t namelen, len, ii;
     char tmpname[FLEN_KEYWORD], *cptr;
-    int tstatus = -1;
+    int tstatus = -1, nblank = 0;
 
     if (*status > 0)
         return(*status);
@@ -968,11 +973,10 @@ int ffmkky(char *keyname,   /* I - keyword name    */
     *tmpname = '\0';
     *card = '\0';
 
-    cptr = keyname;
-    while(*cptr == ' ')  /* skip leading blanks in the name */
-        cptr++;
+    while(*(keyname + nblank) == ' ')  /* skip leading blanks in the name */
+        nblank++;
 
-    strncat(tmpname, cptr, FLEN_KEYWORD - 1);
+    strncat(tmpname, keyname + nblank, FLEN_KEYWORD - 1);
 
     namelen = strlen(tmpname);
     if (namelen)
@@ -1142,7 +1146,7 @@ int ffmkey(fitsfile *fptr,    /* I - FITS file pointer  */
     return(*status);
 }
 /*--------------------------------------------------------------------------*/
-int ffkeyn(char *keyroot,   /* I - root string for keyword name */
+int ffkeyn(const char *keyroot,   /* I - root string for keyword name */
            int value,       /* I - index number to be appended to root name */
            char *keyname,   /* O - output root + index keyword name */
            int *status)     /* IO - error status  */
@@ -1744,9 +1748,9 @@ then values of 'n' less than or equal to n_value will match.
     int i1 = 0, j1 = 0, n1 = 0, m1 = 0;
     int fac;
     char a = ' ';
-    char oldp = ' ';
+    char oldp;
     char c, s;
-    int ip, ic, pat, pass = 0, firstfail = 0;
+    int ip, ic, pat, pass = 0, firstfail;
     char *spat;
 
     if (*status > 0)
@@ -1755,8 +1759,12 @@ then values of 'n' less than or equal to n_value will match.
       return (*status = NULL_INPUT_PTR);
 
     *outrec = '\0';
+/*
     if (*inrec == '\0') return 0;
-
+*/
+    if (*inrec == '\0')
+       strcpy(inrec, " ");
+       
     oldp = '\0';
     firstfail = 0;
 
@@ -2193,12 +2201,12 @@ then values of 'n' less than or equal to n_value will match.
 */
 
 {
-    int i1 = 0, j1 = 0, val = 0;
+    int i1 = 0, j1 = 0, val;
     int fac, nval, mval, lval;
     char a = ' ';
-    char oldp = ' ';
+    char oldp;
     char c, s;
-    int ip, ic, pat, pass = 0, firstfail = 0;
+    int ip, ic, pat, pass = 0, firstfail;
     char *spat;
 
     if (*status > 0)
@@ -2964,6 +2972,12 @@ void ffcdsp(char *tform,    /* value of an ASCII table TFORMn keyword */
         return;    /* input format string was blank */
     }
 
+    if (strchr(tform+ii, '%'))  /* is there a % character in the string?? */
+    {
+        cform[0] = '\0';
+        return;    /* illegal TFORM string (possibly even harmful) */
+    }
+
     cform[0] = '%';  /* start the format string */
 
     strcpy(&cform[1], &tform[ii + 1]); /* append the width and decimal code */
@@ -3458,7 +3472,7 @@ int ffeqtyll( fitsfile *fptr,  /* I - FITS file pointer                       */
     tcolumn *colptr;
     int hdutype, decims, tcode, effcode;
     double tscale, tzero, min_val, max_val;
-    long lngscale = 1, lngzero = 0, tmpwidth;
+    long lngscale, lngzero = 0, tmpwidth;
 
     if (*status > 0)
         return(*status);
@@ -4263,7 +4277,7 @@ int ffpinit(fitsfile *fptr,      /* I - FITS file pointer */
 
     (fptr->Fptr)->headstart[ (fptr->Fptr)->curhdu + 1] =
          (fptr->Fptr)->datastart + 
-         ( (LONGLONG)(pcount + npix) * bytlen * gcount + 2879) / 2880 * 2880;
+         ( ((LONGLONG) pcount + npix) * bytlen * gcount + 2879) / 2880 * 2880;
 
     /*
       initialize the fictitious heap starting address (immediately following
@@ -5141,14 +5155,22 @@ int ffgcprll( fitsfile *fptr, /* I - FITS file pointer                      */
     char message[81];
     tcolumn *colptr;
 
-    /* reset position to the correct HDU if necessary */
-    if (fptr->HDUposition != (fptr->Fptr)->curhdu)
+    if (fptr->HDUposition != (fptr->Fptr)->curhdu) {
+        /* reset position to the correct HDU if necessary */
         ffmahd(fptr, (fptr->HDUposition) + 1, NULL, status);
 
-    /* rescan header if data structure is undefined */
-    else if ((fptr->Fptr)->datastart == DATA_UNDEFINED)
+    } else if ((fptr->Fptr)->datastart == DATA_UNDEFINED) {
+        /* rescan header if data structure is undefined */
         if ( ffrdef(fptr, status) > 0)               
             return(*status);
+
+    } else if (writemode > 0) {
+        /* (re)write END header keyword, if not done already */
+	if ((fptr->Fptr)->ENDpos != 
+	   maxvalue((fptr->Fptr)->headend , (fptr->Fptr)->datastart -2880)) {
+	      ffwend(fptr, status);
+        } 
+    }
 
     /* Do sanity check of input parameters */
     if (firstrow < 1)
@@ -5667,7 +5689,7 @@ int ffcmph(fitsfile *fptr,  /* I -FITS file pointer                         */
     long ii, buffsize = 10000, nblock, nbytes;
     LONGLONG  unused, overlap;
     LONGLONG repeat, offset;
-    char *buffer, *tbuff = 0, comm[FLEN_COMMENT];
+    char *buffer, *tbuff, comm[FLEN_COMMENT];
     char message[81];
     LONGLONG pcount;
     LONGLONG readheapstart, writeheapstart, endpos, t1heapsize, t2heapsize;
@@ -6174,6 +6196,7 @@ int ffchdu(fitsfile *fptr,      /* I - FITS file pointer */
     - check the data fill values, and rewrite them if not correct
 */
     char message[FLEN_ERRMSG];
+    int stdriver;
 
     /* reset position to the correct HDU if necessary */
     if (fptr->HDUposition != (fptr->Fptr)->curhdu)
@@ -6183,7 +6206,11 @@ int ffchdu(fitsfile *fptr,      /* I - FITS file pointer */
     }
     else if ((fptr->Fptr)->writemode == 1)
     {
-        ffrdef(fptr, status);  /* scan header to redefine structure */
+        urltype2driver("stream://", &stdriver);
+
+        /* don't rescan header in special case of writing to stdout */
+        if (((fptr->Fptr)->driver != stdriver)) 
+             ffrdef(fptr, status); 
 
         if ((fptr->Fptr)->heapsize > 0) {
           ffuptf(fptr, status);  /* update the variable length TFORM values */
@@ -6426,7 +6453,7 @@ int ffwend(fitsfile *fptr,       /* I - FITS file pointer */
     int ii, tstatus;
     LONGLONG endpos;
     long nspace;
-    char blankkey[FLEN_CARD], endkey[FLEN_CARD], keyrec[FLEN_CARD];
+    char blankkey[FLEN_CARD], endkey[FLEN_CARD], keyrec[FLEN_CARD] = "";
 
     if (*status > 0)
         return(*status);
@@ -6487,6 +6514,9 @@ int ffwend(fitsfile *fptr,       /* I - FITS file pointer */
     ffmbyt(fptr, endpos, REPORT_EOF, status);  /* move to END position */
 
     ffpbyt(fptr, 80, endkey, status); /*  write the END keyword to header */
+    
+    /* store this position, for later reference */
+    (fptr->Fptr)->ENDpos = endpos;
 
     if (*status > 0)
         ffpmsg("Error while writing END card (ffwend).");
@@ -6997,7 +7027,7 @@ int ffgiet( fitsfile *fptr,  /* I - FITS file pointer                       */
 */
 {
     int tstatus;
-    long lngscale = 1, lngzero = 0;
+    long lngscale, lngzero = 0;
     double bscale, bzero, min_val, max_val;
 
     if (*status > 0)
@@ -7354,6 +7384,7 @@ int ffmnhd(fitsfile *fptr,      /* I - FITS file pointer                    */
 {
     char extname[FLEN_VALUE];
     int ii, hdutype, alttype, extnum, tstatus, match, exact;
+    int slen, putback = 0, chopped = 0;
     long extver;
 
     if (*status > 0)
@@ -7361,12 +7392,30 @@ int ffmnhd(fitsfile *fptr,      /* I - FITS file pointer                    */
 
     extnum = fptr->HDUposition + 1;  /* save the current HDU number */
 
-    for (ii=1; 1; ii++)    /* loop until EOF */
+    /*
+       This is a kludge to deal with a special case where the
+       user specified a hduname that ended with a # character, which
+       CFITSIO previously interpreted as a flag to mean "don't copy any
+       other HDUs in the file into the virtual file in memory.  If the
+       remaining hduname does not end with a # character (meaning that
+       the user originally entered a hduname ending in 2 # characters)
+       then there is the possibility that the # character should be
+       treated literally, if the actual EXTNAME also ends with a #.
+       Setting putback = 1 means that we need to test for this case later on.
+    */
+        
+    if ((fptr->Fptr)->only_one) {  /* if true, name orignally ended with a # */
+       slen = strlen(hduname);
+       if (hduname[slen - 1] != '#') /* This will fail if real EXTNAME value */
+           putback = 1;              /*  ends with 2 # characters. */
+    } 
+
+    for (ii=1; 1; ii++)    /* loop over all HDUs until EOF */
     {
         tstatus = 0;
         if (ffmahd(fptr, ii, &hdutype, &tstatus))  /* move to next HDU */
         {
-           ffmahd(fptr, extnum, 0, status); /* restore file position */
+           ffmahd(fptr, extnum, 0, status); /* restore original file position */
            return(*status = BAD_HDU_NUM);   /* couldn't find desired HDU */
         }
 
@@ -7374,48 +7423,75 @@ int ffmnhd(fitsfile *fptr,      /* I - FITS file pointer                    */
         if (fits_is_compressed_image(fptr, status))
             alttype = BINARY_TBL;
         
-        /* matching type? */
+        /* Does this HDU have a matching type? */
         if (exttype == ANY_HDU || hdutype == exttype || hdutype == alttype)
         {
-          ffmaky(fptr, 2, status);
-          if (ffgkys(fptr, "EXTNAME", extname, 0, &tstatus) > 0) /* name */
+          ffmaky(fptr, 2, status); /* reset to the 2nd keyword in the header */
+          if (ffgkys(fptr, "EXTNAME", extname, 0, &tstatus) <= 0) /* get keyword */
           {
-               tstatus = 0;
-               /* look for HDUNAME, since EXTNAME didn't exist */
-               ffgkys(fptr, "HDUNAME", extname, 0, &tstatus);
-          }
-          else
-          {
-               /* check if EXTNAME is the name we are looking for. */
-               /* If not, try reading the HDUNAME keyword.         */
+               if (putback) {          /* more of the kludge */
+                   /* test if the EXTNAME value ends with a #;  if so, chop it  */
+		   /* off before comparing the strings */
+		   chopped = 0;
+	           slen = strlen(extname);
+		   if (extname[slen - 1] == '#') {
+		       extname[slen - 1] = '\0'; 
+                       chopped = 1;
+                   }
+               }
+
+               /* see if the strings are an exact match */
                ffcmps(extname, hduname, CASEINSEN, &match, &exact);
-               if (!exact)
-                   ffgkys(fptr, "HDUNAME", extname, 0, &tstatus);
           }
 
-          if (tstatus <= 0)
+          /* if EXTNAME keyword doesn't exist, or it does not match, then try HDUNAME */
+          if (tstatus || !exact)
+	  {
+               tstatus = 0;
+               if (ffgkys(fptr, "HDUNAME", extname, 0, &tstatus) <= 0)
+	       {
+                   if (putback) {          /* more of the kludge */
+		       chopped = 0;
+	               slen = strlen(extname);
+		       if (extname[slen - 1] == '#') {
+		           extname[slen - 1] = '\0';  /* chop off the # */
+                           chopped = 1;
+                       }
+                   }
+
+                   /* see if the strings are an exact match */
+                   ffcmps(extname, hduname, CASEINSEN, &match, &exact);
+               }
+          }
+
+          if (!tstatus && exact)    /* found a matching name */
           {
-            ffcmps(extname, hduname, CASEINSEN, &match, &exact);
-            if (exact)  /* names match? */
-            {
-              if (hduver)  /* need to check if version numbers match? */
-              {
+             if (hduver)  /* need to check if version numbers match? */
+             {
                 if (ffgkyj(fptr, "EXTVER", &extver, 0, &tstatus) > 0)
                     extver = 1;  /* assume default EXTVER value */
 
                 if ( (int) extver == hduver)
                 {
+                    if (chopped) {
+                        /* The # was literally part of the name, not a flag */
+	                (fptr->Fptr)->only_one = 0;  
+                    }
                     return(*status);    /* found matching name and vers */
                 }
-              }
-              else
-              {
-                  return(*status);    /* found matching name */
-              }
-            }
-          }
-        }
-    }
+             }
+             else
+             {
+                 if (chopped) {
+                     /* The # was literally part of the name, not a flag */
+	            (fptr->Fptr)->only_one = 0;  
+                 }
+                 return(*status);    /* found matching name */
+             }
+          }  /* end of !tstatus && exact */
+
+        }  /* end of matching HDU type */
+    }  /* end of loop over HDUs */
 }
 /*--------------------------------------------------------------------------*/
 int ffthdu(fitsfile *fptr,      /* I - FITS file pointer                    */
@@ -7604,7 +7680,7 @@ int ffiblk(fitsfile *fptr,      /* I - FITS file pointer               */
             ffgbyt(fptr, 2880, inbuff,status);  /* read one record */
 
             /* move forward to the write postion */
-            ffmbyt(fptr, jpoint + (nblock * 2880), IGNORE_EOF, status);
+            ffmbyt(fptr, jpoint + ((LONGLONG) nblock * 2880), IGNORE_EOF, status);
 
             ffpbyt(fptr, 2880, inbuff, status);  /* write the record */
 
@@ -7619,11 +7695,11 @@ int ffiblk(fitsfile *fptr,      /* I - FITS file pointer               */
     }
 
     if (headdata == 0)         /* update data start address */
-      (fptr->Fptr)->datastart += ((LONGLONG)nblock * 2880);
+      (fptr->Fptr)->datastart += ((LONGLONG) nblock * 2880);
 
     /* update following HDU addresses */
     for (ii = (fptr->Fptr)->curhdu; ii <= (fptr->Fptr)->maxhdu; ii++)
-         (fptr->Fptr)->headstart[ii + 1] += ((LONGLONG)nblock * 2880);
+         (fptr->Fptr)->headstart[ii + 1] += ((LONGLONG) nblock * 2880);
 
     return(*status);
 }

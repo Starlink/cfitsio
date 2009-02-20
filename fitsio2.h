@@ -262,7 +262,7 @@
 
 #define COMPRESS_NULL_VALUE -2147483647
 
-int ffmkky(char *keyname, char *keyval, char *comm, char *card, int *status);
+int ffmkky(const char *keyname, char *keyval, const char *comm, char *card, int *status);
 int ffgnky(fitsfile *fptr, char *card, int *status);
 void ffcfmt(char *tform, char *cform);
 void ffcdsp(char *tform, char *cform);
@@ -878,6 +878,9 @@ int  ffffrw_work( long totalrows, long offset, long firstrow,
                   long nrows, int nCols, iteratorCol *colData,
                   void *userPtr );
 
+int fits_translate_pixkeyword(char *inrec, char *outrec,char *patterns[][2],
+    int npat, int naxis, int *colnum, int *pat_num, int *i,
+      int *j, int *n, int *m, int *l, int *status);
 
 /*  image compression routines */
 int fits_write_compressed_img(fitsfile *fptr, 
@@ -1016,6 +1019,17 @@ int file_seek(int driverhandle, LONGLONG offset);
 int file_read (int driverhandle, void *buffer, long nbytes);
 int file_write(int driverhandle, void *buffer, long nbytes);
 int file_is_compressed(char *filename);
+
+/* stream driver I/O routines */
+
+int stream_open(char *filename, int rwmode, int *driverhandle);
+int stream_create(char *filename, int *driverhandle);
+int stream_size(int driverhandle, LONGLONG *filesize);
+int stream_close(int driverhandle);
+int stream_flush(int driverhandle);
+int stream_seek(int driverhandle, LONGLONG offset);
+int stream_read (int driverhandle, void *buffer, long nbytes);
+int stream_write(int driverhandle, void *buffer, long nbytes);
 
 /* memory driver I/O routines */
 

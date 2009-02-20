@@ -273,7 +273,8 @@ int stdin_checkfile(char *urltype, char *infile, char *outfile)
 {
     if (strlen(outfile))
     {
-        strcpy(stdin_outfile,outfile); /* an output file is specified */
+        stdin_outfile[0] = '\0';
+        strncat(stdin_outfile,outfile,FLEN_FILENAME-1); /* an output file is specified */
 	strcpy(urltype,"stdinfile://");
     }
     else
@@ -288,7 +289,7 @@ int stdin_open(char *filename, int rwmode, int *handle)
   The file name is ignored in this case.
 */
 {
-    int status = 0;
+    int status;
     char cbuff;
 
     if (*stdin_outfile)
@@ -456,9 +457,9 @@ int stdin2file(int handle)  /* handle number */
   Copy the stdin stream to a file.  .
 */
 {
-    size_t nread = 0;
+    size_t nread;
     char simple[] = "SIMPLE";
-    int c, ii, jj, status = 0;
+    int c, ii, jj, status;
     char recbuf[RECBUFLEN];
 
     ii = 0;

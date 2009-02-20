@@ -4,9 +4,18 @@
 
 #include <time.h>
 #include <float.h>
+#include <signal.h>
 #include "fitsio.h"
 #include "fpack.h"
 #include <sys/time.h>
+#include <time.h>
+#include <stdlib.h>
+
+/* these filename buffer are used to delete temporary files */
+/* in case the program is aborted */
+char tempfilename[SZ_STR];    
+char tempfilename2[SZ_STR];
+char tempfilename3[SZ_STR];
 
 /* nearest integer function */
 # define NINT(x)  ((x >= 0.) ? (int) (x + 0.5) : (int) (x - 0.5))
@@ -32,26 +41,13 @@ FILE *outreport;
 /* dimension of central image area to be sampled for test statistics */
 int XSAMPLE = 4100;
 int YSAMPLE = 4100;
-
-int marktime(int *status);
-int gettime(float *elapse, float *elapscpu, int *status);
-int fits_read_image_speed (fitsfile *infptr, float *whole_elapse, 
-    float *whole_cpu, float *row_elapse, float *row_cpu, int *status);
-
-int fp_i2stat(fitsfile *infptr, int naxis, long *naxes, int *status);
-int fp_i4stat(fitsfile *infptr, int naxis, long *naxes, int *status);
-int fp_r4stat(fitsfile *infptr, int naxis, long *naxes, int *status);
-int fp_i2rescale(fitsfile *infptr, int naxis, long *naxes, double rescale,
-    fitsfile *outfptr, int *status);
-int fp_i4rescale(fitsfile *infptr, int naxis, long *naxes, double rescale,
-    fitsfile *outfptr, int *status);
     
-fp_msg (char *msg) { printf ("%s", msg); }
-fp_version () { fp_msg (FPACK_VERSION); fp_msg ("\n"); }
-fp_noop () { fp_msg ("input and output files are unchanged\n"); }
+int fp_msg (char *msg) { printf ("%s", msg); }
+int fp_version (void) { fp_msg (FPACK_VERSION); fp_msg ("\n"); }
+int fp_noop (void) { fp_msg ("Input and output files are unchanged.\n"); }
 
 /*--------------------------------------------------------------------------*/
-fp_init (fpstate *fpptr)
+int fp_init (fpstate *fpptr)
 {
 	int	ii;
 
@@ -68,12 +64,15 @@ fp_init (fpstate *fpptr)
 	fpptr->to_stdout = 0;
 	fpptr->listonly = 0;
 	fpptr->clobber = 0;
+	fpptr->delete_input = 0;
+	fpptr->do_not_prompt = 0;
 	fpptr->do_checksums = 1;
+	fpptr->do_gzip_file = 0;
 	fpptr->test_all = 0;
 	fpptr->verbose = 0;
 
 	fpptr->prefix[0] = (char) NULL;
-	fpptr->suffix[0] = (char) NULL;
+	fpptr->delete_suffix = 0;
 	fpptr->outfile[0] = (char) NULL;
 
 	fpptr->firstfile = 1;
@@ -82,30 +81,30 @@ fp_init (fpstate *fpptr)
 	 */
 	fpptr->initialized = FP_INIT_MAGIC;
 	fpptr->preflight_checked = 0;
-	return;
+	return(0);
 }
 
 /*--------------------------------------------------------------------------*/
-fp_list (int argc, char *argv[], fpstate fpvar)
+int fp_list (int argc, char *argv[], fpstate fpvar)
 {
 	fitsfile *infptr;
 	char	infits[SZ_STR];
 	int	hdunum, iarg, stat=0;
 
 	if (fpvar.initialized != FP_INIT_MAGIC) {
-	    fp_msg ("internal initialization error\n"); exit (-1);
+	    fp_msg ("Error: internal initialization error\n"); exit (-1);
 	}
 
 	for (iarg=fpvar.firstfile; iarg < argc; iarg++) {
 	    strncpy (infits, argv[iarg], SZ_STR);
 
 	    if (strchr (infits, '[') || strchr (infits, ']')) {
-		fp_msg ("section/extension notation not supported: ");
+		fp_msg ("Error: section/extension notation not supported: ");
 		fp_msg (infits); fp_msg ("\n"); exit (-1);
 	    }
 
 	    if (access (infits, R_OK) != 0) {
-		fp_msg ("can't read input file ");
+		fp_msg ("Error: can't find or open input file ");
 		fp_msg (infits); fp_msg ("\n"); exit (-1);
 	    }
 
@@ -122,11 +121,11 @@ fp_list (int argc, char *argv[], fpstate fpvar)
 	    fits_close_file (infptr, &stat);
 	    if (stat) { fits_report_error (stderr, stat); exit (stat); }
 	}
-	return;
+	return(0);
 }
 
 /*--------------------------------------------------------------------------*/
-fp_info (char *infits)
+int fp_info (char *infits)
 {
 	struct  stat    sbuf;
 	char	msg[SZ_STR];
@@ -134,7 +133,7 @@ fp_info (char *infits)
 	unsigned mode;
 
 	if (stat (infits, &sbuf) != 0) {
-	    fp_msg ("can't stat "); fp_msg (infits); fp_msg ("\n");
+	    fp_msg ("Error: can't stat "); fp_msg (infits); fp_msg ("\n");
 
 	} else {
             size = (int) sbuf.st_size;
@@ -146,11 +145,11 @@ fp_info (char *infits)
 
 	    sprintf (msg, "%s: %d bytes\n", infits, size); fp_msg (msg);
 	}
-	return;
+	return(0);
 }
 
 /*--------------------------------------------------------------------------*/
-fp_info_hdu (fitsfile *infptr)
+int fp_info_hdu (fitsfile *infptr)
 {
 	long	naxes[9] = {1, 1, 1, 1, 1, 1, 1, 1, 1};
 	char	msg[SZ_STR], val[SZ_CARD], com[SZ_CARD];
@@ -201,82 +200,195 @@ fp_info_hdu (fitsfile *infptr)
 
 	    fits_movrel_hdu (infptr, 1, NULL, &stat);
 	}
-	return;
+	return(0);
 }
 
 /*--------------------------------------------------------------------------*/
-fp_preflight (int argc, char *argv[], fpstate *fpptr)
+int fp_preflight (int argc, char *argv[], int unpack, fpstate *fpptr)
 {
 	char	infits[SZ_STR], outfits[SZ_STR], temp[SZ_STR], *cptr;
-	int	iarg;
+	int	iarg, suflen, namelen, nfiles = 0;
 
 	if (fpptr->initialized != FP_INIT_MAGIC) {
-	    fp_msg ("internal initialization error\n"); exit (-1);
+	    fp_msg ("Error: internal initialization error\n"); exit (-1);
 	}
 
 	for (iarg=fpptr->firstfile; iarg < argc; iarg++) {
+
+            outfits[0] = '\0';
+	    
+            if (strlen(argv[iarg]) > SZ_STR - 4) {  /* allow for .fz or .gz suffix */
+		    fp_msg ("Error: input file name\n   "); fp_msg (argv[iarg]);
+		    fp_msg ("\n   is too long\n"); fp_noop (); exit (-1);
+	    }
+
 	    strncpy (infits, argv[iarg], SZ_STR);
 
 	    if (strchr (infits, '[') || strchr (infits, ']')) {
-		fp_msg ("section/extension notation not supported: ");
+		fp_msg ("Error: section/extension notation not supported: ");
 		fp_msg (infits); fp_msg ("\n"); fp_noop (); exit (-1);
 	    }
 	    
-	    if (access (infits, R_OK) != 0) {
-		fp_msg ("can't read input file "); fp_msg (infits);
-		fp_msg ("\n"); fp_noop (); exit (-1);
-	    }
+            if (unpack) {
+	  	/* ********** This section applies to funpack ************ */
 
-	    /* CHECK FITS or other image info */
+	      /* check that input file  exists */
+	      if (access (infits, R_OK) != 0) {  /* if not, then check if */
+		    strcat(infits, ".fz");       /* a .fz version exsits */
+	            if (access (infits, R_OK) != 0) {
+                        namelen = strlen(infits);
+                        infits[namelen - 3] = '\0';  /* remove the .fz suffix */
+		        fp_msg ("Error: can't find or read input file "); fp_msg (infits);
+		        fp_msg ("\n"); fp_noop (); exit (-1);
+                    }
+	      } else {   /* make sure a .fz version of the same file doesn't exist */
+                    namelen = strlen(infits);
+		    strcat(infits, ".fz");   
+	            if (access (infits, R_OK) == 0) {
+                        infits[namelen] = '\0';  /* remove the .fz suffix */
+		        fp_msg ("Error: ambiguous input file name.  Which file should be unpacked?:\n  ");
+		        fp_msg (infits); fp_msg ("\n  "); 
+		        fp_msg (infits); fp_msg (".fz\n"); 
+		        fp_noop (); exit (-1);
+                    } else {
+                        infits[namelen] = '\0';  /* remove the .fz suffix */
+		    }
+	      }
 
-	    if (fpptr->prefix[0]) {
-		sprintf (outfits, "%s%s", fpptr->prefix, argv[iarg]);
+              /* if writing to stdout, then we are all done */
+	      if (fpptr->to_stdout) {
+                      continue;
+	      }
 
-		if (! fpptr->clobber && access (outfits, F_OK) == 0) {
-		    fp_msg ("output file "); fp_msg (outfits);
-		    fp_msg (" already exists\n"); fp_noop (); exit (-1);
-		}
-	    } else if (fpptr->suffix[0]) {
-		strncpy (temp, argv[iarg], SZ_STR);
-		cptr = strchr(temp, '.');
+              if (fpptr->outfile[0]) {  /* user specified output file name */
+	          nfiles++;
+		  if (nfiles > 1) {
+		      fp_msg ("Error: cannot use same output file name for multiple files:\n   ");
+		      fp_msg (fpptr->outfile);
+		      fp_msg ("\n"); fp_noop (); exit (-1);
+	          }
 
-		if (cptr) 
-		    *cptr = 0;  /* terminate the string at the "." */
+                  /* check that output file doesn't exist */
+	          if (access (fpptr->outfile, F_OK) == 0) {
+		            fp_msg ("Error: output file already exists:\n "); 
+			    fp_msg (fpptr->outfile);
+		            fp_msg ("\n "); fp_noop (); exit (-1);
+		  } 
+                  continue;
+	      }     
 
-		strcpy(outfits, temp);  /* copy the root name */
-		strcat(outfits, fpptr->suffix);  /* append the suffix */
+	      /* construct output file name to test */
+	      if (fpptr->prefix[0]) {
+                  if (strlen(fpptr->prefix) + strlen(infits) > SZ_STR - 1) {
+		      fp_msg ("Error: output file name for\n   "); fp_msg (infits);
+		      fp_msg ("\n   is too long with the prefix\n"); fp_noop (); exit (-1);
+	          }
+	          strcat(outfits,fpptr->prefix);
+	      }
 
-		if (cptr) {
-		    *cptr = '.';  /* restore the "dot" */
-		    strcat(outfits, cptr); /* append the .ext */
-		}
+	      strcat(outfits, infits);
 
-		if (! fpptr->clobber && access (outfits, F_OK) == 0) {
-		    fp_msg ("output file "); fp_msg (outfits);
-		    fp_msg (" already exists\n"); fp_noop (); exit (-1);
-		}
-	    }
+	      /* remove .gz suffix, if present (output is not gzipped) */
+              namelen = strlen(outfits);
+	      if ( !strcmp(".gz", outfits + namelen - 3) ) {
+                        outfits[namelen - 3] = '\0';
+	      }
 
-	    /* other CHECKS */
+	      /* check for .fz suffix that is sometimes required */
+	      /* and remove it if present */
+              namelen = strlen(outfits);
+	      if ( !strcmp(".fz", outfits + namelen - 3) ) { /* suffix is present */
+                        outfits[namelen - 3] = '\0';
+	      } else if (fpptr->delete_suffix) {  /* required suffix is missing */
+		    fp_msg ("Error: input compressed file "); fp_msg (infits);
+		    fp_msg ("\n does not have the default .fz suffix.\n"); 
+		    fp_noop (); exit (-1);
+	      }
+
+	      /* if infits != outfits, make sure outfits doesn't already exist */
+              if (strcmp(infits, outfits)) {
+	                if (access (outfits, F_OK) == 0) {
+		            fp_msg ("Error: output file already exists:\n "); fp_msg (outfits);
+		            fp_msg ("\n "); fp_noop (); exit (-1);
+		        }       
+	      }
+
+	      /* if gzipping the output, make sure .gz file doesn't exist */
+	      if (fpptr->do_gzip_file) {
+	                strcat(outfits, ".gz");
+	                if (access (outfits, F_OK) == 0) {
+		            fp_msg ("Error: output file already exists:\n "); fp_msg (outfits);
+		            fp_msg ("\n "); fp_noop (); exit (-1);
+		        }       
+              		namelen = strlen(outfits);
+                        outfits[namelen - 3] = '\0';  /* remove the .gz suffix again */
+	      }
+	  } else {
+	  	/* ********** This section applies to fpack ************ */
+
+	      /* check that input file  exists */
+	      if (access (infits, R_OK) != 0) {  /* if not, then check if */
+		    strcat(infits, ".gz");     /* a gzipped version exsits */
+	            if (access (infits, R_OK) != 0) {
+                        namelen = strlen(infits);
+                        infits[namelen - 3] = '\0';  /* remove the .gz suffix */
+		        fp_msg ("Error: can't find or read input file "); fp_msg (infits);
+		        fp_msg ("\n"); fp_noop (); exit (-1);
+                    }
+	      }
+
+              /* make sure the file to pack does not already have a .fz suffix */
+              namelen = strlen(infits);
+	      if ( !strcmp(".fz", infits + namelen - 3) ) {
+		        fp_msg ("Error: fpack input file already has '.fz' suffix\n" ); fp_msg (infits);
+		        fp_msg ("\n"); fp_noop (); exit (-1);
+	      }
+
+              /* if writing to stdout, or just testing the files, then we are all done */
+	      if (fpptr->to_stdout || fpptr->test_all) {
+                        continue;
+	      }
+
+	      /* construct output file name */
+	      strcpy(outfits, infits);
+	      
+	      /* remove .gz suffix, if present (output is not gzipped) */
+              namelen = strlen(outfits);
+	      if ( !strcmp(".gz", outfits + namelen - 3) ) {
+                        outfits[namelen - 3] = '\0';
+	      }
+	      
+	      /* If not clobbering the input file, add .fz suffix to output name */
+	      if (! fpptr->clobber)
+		        strcat(outfits, ".fz");
+			
+	      /* if infits != outfits, make sure outfits doesn't already exist */
+              if (strcmp(infits, outfits)) {
+	                if (access (outfits, F_OK) == 0) {
+		            fp_msg ("Error: output file already exists:\n "); fp_msg (outfits);
+		            fp_msg ("\n "); fp_noop (); exit (-1);
+		        }       
+	      }
+	  }   /* end of fpack section */
 	}
 
 	fpptr->preflight_checked++;
-	return;
+	return(0);
 }
 
 /*--------------------------------------------------------------------------*/
 /* must run fp_preflight() before fp_loop()
  */
-fp_loop (int argc, char *argv[], int unpack, fpstate fpvar)
+int fp_loop (int argc, char *argv[], int unpack, fpstate fpvar)
 {
-	char	infits[SZ_STR], outfits[SZ_STR], outfits2[SZ_STR];
-	char	temp[SZ_STR], *cptr;
-	int	iarg;
-	
+	char	infits[SZ_STR], outfits[SZ_STR];
+	char	temp[SZ_STR], answer[30], *cptr;
+	int	iarg, islossless, namelen;
+        
 	if (fpvar.initialized != FP_INIT_MAGIC) {
-	    fp_msg ("internal initialization error\n"); exit (-1);
+	    fp_msg ("Error: internal initialization error\n"); exit (-1);
 	} else if (! fpvar.preflight_checked) {
-	    fp_msg ("internal preflight error\n"); exit (-1);
+	    fp_msg ("Error: internal preflight error\n"); exit (-1);
 	}
 
 
@@ -285,104 +397,202 @@ fp_loop (int argc, char *argv[], int unpack, fpstate fpvar)
 		fprintf(outreport," Filename Extension BITPIX NAXIS1 NAXIS2 Size N_nulls Minval Maxval Mean Sigm Noise1 Noise3 T_whole T_rowbyrow ");
 		fprintf(outreport,"[Comp_ratio, Pack_cpu, Unpack_cpu, Lossless readtimes] (repeated for Rice, Hcompress and GZIP)\n");
 	}
-	    
+
+
+	tempfilename[0] = '\0';
+	tempfilename2[0] = '\0';
+	tempfilename3[0] = '\0';
+
+/* set up signal handler to delete temporary file on abort */	    
+#ifdef SIGINT
+    if (signal(SIGINT, SIG_IGN) != SIG_IGN) {
+	(void) signal(SIGINT,  abort_fpack); 
+    }
+#endif
+
+#ifdef SIGTERM
+    if (signal(SIGTERM, SIG_IGN) != SIG_IGN) {
+	(void) signal(SIGTERM,  abort_fpack); 
+    }
+#endif
+
+#ifdef SIGHUP
+    if (signal(SIGHUP, SIG_IGN) != SIG_IGN) {
+	(void) signal(SIGHUP,  abort_fpack);
+    }
+#endif
+
 	for (iarg=fpvar.firstfile; iarg < argc; iarg++) {
-	    strncpy (infits, argv[iarg], SZ_STR);
 
-	    if (fpvar.to_stdout) {
-		sprintf (outfits, "-");
+          temp[0] = '\0';
+	  outfits[0] = '\0';
+          islossless = 1;
 
-	    } else if (fpvar.prefix[0]) {
-		sprintf (outfits, "%s%s", fpvar.prefix, argv[iarg]);
+	  strncpy (infits, argv[iarg], SZ_STR - 1);
 
-		if (access (outfits, F_OK) == 0) {
-		    if (fpvar.clobber) {
-			if (unlink (outfits) != 0) {
-			    fp_msg ("error clobbering ");
-			    fp_msg (outfits); fp_msg ("\n"); exit (-1);
-			}
-		    } else {
-			/* checked in fp_preflight(), shouldn't get here */
-			fp_msg ("internal clobber error\n"); exit (-1);
-		    }
-		}
+          if (unpack) {
+	  	/* ********** This section applies to funpack ************ */
 
-	    } else if (fpvar.suffix[0]) {
-		strncpy (temp, argv[iarg], SZ_STR);
-		cptr = strchr(temp, '.');
+	      /* find input file */
+	      if (access (infits, R_OK) != 0) {  /* if not, then */
+		    strcat(infits, ".fz");       /* a .fz version must exsit */
+	      }
 
-		if (cptr) 
-		    *cptr = 0;  /* terminate the string at the "." */
+	      if (fpvar.to_stdout) {
+		strcpy(outfits, "-");
 
-		strcpy(outfits, temp);  /* copy the root name */
-		strcat(outfits, fpvar.suffix);  /* append the suffix */
+              } else if (fpvar.outfile[0]) {  /* user specified output file name */
+	          strcpy(outfits, fpvar.outfile);
 
-		if (cptr) {
-		    *cptr = '.';  /* restore the "dot" */
-		    strcat(outfits, cptr); /* append the .ext */
-		}
+	      } else {
+	          /* construct output file name */
+	          if (fpvar.prefix[0]) {
+	              strcat(outfits,fpvar.prefix);
+	          }
 
-		if (access (outfits, F_OK) == 0) {
-		    if (fpvar.clobber) {
-			if (unlink (outfits) != 0) {
-			    fp_msg ("error clobbering ");
-			    fp_msg (outfits); fp_msg ("\n"); exit (-1);
-			}
-		    } else {
-			/* checked in fp_preflight(), shouldn't get here */
-			fp_msg ("internal clobber error\n"); exit (-1);
-		    }
-		}
+	          strcat(outfits, infits);
 
+	          /* remove .gz suffix, if present (output is not gzipped) */
+                  namelen = strlen(outfits);
+	          if ( !strcmp(".gz", outfits + namelen - 3) ) {
+                        outfits[namelen - 3] = '\0';
+	          }
 
-	    } else {
-		strcpy (outfits, "fptmp.XXXXXX"); mktemp (outfits);
+	          /* check for .fz suffix that is sometimes required */
+	          /* and remove it if present */
+                  namelen = strlen(outfits);
+	          if ( !strcmp(".fz", outfits + namelen - 3) ) { /* suffix is present */
+                        outfits[namelen - 3] = '\0';
+	          }
+	      }
+
+	  } else {
+	  	/* ********** This section applies to fpack ************ */
+
+	      if (fpvar.to_stdout) {
+		strcpy(outfits, "-");
+	      } else if (! fpvar.test_all) {
+	          /* construct output file name */
+	          strcpy(outfits, infits);
+	      
+	          /* remove .gz suffix, if present (output is not gzipped) */
+                  namelen = strlen(outfits);
+	          if ( !strcmp(".gz", outfits + namelen - 3) ) {
+                        outfits[namelen - 3] = '\0';
+	          }
+	      
+	          /* If not clobbering the input file, add .fz suffix to output name */
+	          if (! fpvar.clobber)
+		        strcat(outfits, ".fz");
+	      }
+	  }
+
+          strncpy(temp, outfits, SZ_STR-1);
+
+          if (!strcmp(infits, outfits) ) {  /* are input and output names the same? */
+
+                /* clobber the input file with the output file with the same name */
+                if (! fpvar.clobber) {
+                    fp_msg ("\nError: must use -F flag to clobber input file.\n");
+		    exit (-1);
+		} 
+
+	        /* create temporary output file */
+		strcpy (outfits, "fpack_tmp.XXXXXX"); mktemp (outfits);
 
 		if (access (outfits, F_OK) == 0) {
 		    /* unlikely name collision, try again (once) */
-		    strcpy (outfits, "fptmp.XXXXXX"); mktemp (outfits);
+		    strcpy (outfits, "fpack_tmp.XXXXXX"); mktemp (outfits);
 
 		    if (access (outfits, F_OK) == 0) {
-			fp_msg ("temporary file "); fp_msg (outfits);
+			fp_msg ("Error: temporary file "); fp_msg (outfits);
 			fp_msg (" already exists\n"); exit (-1);
 		    }
 		}
+                strcpy(tempfilename, outfits);  /* store temp file name, in case of abort */
 	    }
 
+
+            /* *************** now do the real work ********************* */
+	    
 	    if (fpvar.verbose && ! fpvar.to_stdout)
 		printf("%s ", infits);
 		
 	    if (fpvar.test_all) {   /* compare all the algorithms */
 
-		strcpy (outfits,  "fptmp.XXXXXX"); mktemp (outfits);
-		strcpy (outfits2, "fptmp.XXXXXX"); mktemp (outfits2);
+		strcpy (tempfilename,  "fpack_tmp.XXXXXX"); mktemp (tempfilename);
+		strcpy (tempfilename2, "fpack_tmp.XXXXXX"); mktemp (tempfilename2);
 
-		fp_test (infits, outfits, outfits2, fpvar);
+		fp_test (infits, tempfilename, tempfilename2, fpvar);
 
-		remove(outfits);
-		remove(outfits2);
+		remove(tempfilename);
+                tempfilename[0] = '\0';   /* clear the temp file name */
+		remove(tempfilename2);
+                tempfilename2[0] = '\0';
+                continue;
 
 	    } else if (unpack) {
 		fp_unpack (infits, outfits, fpvar);
+
 	    }  else {
-		fp_pack (infits, outfits, fpvar);
+		fp_pack (infits, outfits, fpvar, &islossless);
 	    }
 
-	    /* rename clobbers input, may be unix/shell version dependent
-	     */
-	    if (! fpvar.to_stdout && ! fpvar.prefix[0] &&
-	        ! fpvar.suffix[0] && ! fpvar.test_all) {
-		if (!fpvar.islossless) {
-		    fp_msg ("\nError: clobbering ");
-		    fp_msg (infits); 
-		    fp_msg (" with the compressed version of\n");
-		    fp_msg ("the file is only allowed with LOSSLESS compression methods.\n");
-		    exit (-1);	
+	    if (fpvar.to_stdout) {
+		continue;
+	    }
 
-		} else if (rename (outfits, infits) != 0) {
-		    fp_msg ("\nError renaming tmp file to ");
-		    fp_msg (infits); fp_msg ("\n"); exit (-1);
+            /* ********** clobber and/or delete files, if needed ************** */
+
+            if (!strcmp(infits, temp) && fpvar.clobber ) {  
+
+		if (!islossless && ! fpvar.do_not_prompt) {
+		    fp_msg ("\nFile ");
+		    fp_msg (infits); 
+		    fp_msg ("\nwas compressed with a LOSSY method.  Overwrite the\n");
+		    fp_msg ("original file with the compressed version? (Y/N) ");
+		    fgets(answer, 29, stdin);
+		    if (answer[0] != 'Y' && answer[0] != 'y') {
+		        fp_msg ("\noriginal file NOT overwritten!\n");
+			remove(outfits);
+                        continue;
+		    }
 		}
+ 
+	        /* rename clobbers input, may be unix/shell version dependent */
+		if (rename (outfits, temp) != 0) {
+		        fp_msg ("\nError renaming tmp file to ");
+		        fp_msg (temp); fp_msg ("\n"); exit (-1);
+		}
+		tempfilename[0] = '\0';  /* clear temporary file name */
+                strcpy(outfits, temp);
+
+	    } else if (fpvar.clobber || fpvar.delete_input) {      /* delete the input file */
+	         if (!islossless && !fpvar.do_not_prompt) {
+		    fp_msg ("\nFile ");
+		    fp_msg (infits); 
+		    fp_msg ("\nwas compressed with a LOSSY method.  \n");
+		    fp_msg ("Delete the original file? (Y/N) ");
+		    fgets(answer, 29, stdin);
+		    if (answer[0] != 'Y' && answer[0] != 'y') {
+		        fp_msg ("\noriginal file NOT deleted!\n");
+		    } else if (remove(infits) != 0) {
+		        fp_msg ("\nError deleting input file ");
+		        fp_msg (infits); fp_msg ("\n"); exit (-1);
+		    }
+		  } else {
+		     if (remove(infits) != 0) {
+		        fp_msg ("\nError deleting input file ");
+		        fp_msg (infits); fp_msg ("\n"); exit (-1);
+		     }
+		  }
+	    }
+
+	    if (fpvar.do_gzip_file) {       /* gzip the output file */
+		strcpy(temp, "gzip -1 ");
+		strcat(temp,outfits);
+                system(temp);
+	        strcat(outfits, ".gz");    /* only possibible with funpack */
 	    }
 
 	    if (fpvar.verbose && ! fpvar.to_stdout)
@@ -392,13 +602,13 @@ fp_loop (int argc, char *argv[], int unpack, fpstate fpvar)
 
 	if (fpvar.test_all && fpvar.outfile[0])
 	    fclose(outreport);
-	return;
+	return(0);
 }
 
 /*--------------------------------------------------------------------------*/
-/* fp_pack assumes the output file does not exist
+/* fp_pack assumes the output file does not exist (checked by preflight)
  */
-fp_pack (char *infits, char *outfits, fpstate fpvar)
+int fp_pack (char *infits, char *outfits, fpstate fpvar, int *islossless)
 {
 	fitsfile *infptr, *outfptr;
 	int	stat=0;
@@ -415,11 +625,10 @@ fp_pack (char *infits, char *outfits, fpstate fpvar)
 	fits_set_tile_dim (outfptr, 6, fpvar.ntile, &stat);
 
 	if (stat) { fits_report_error (stderr, stat); exit (stat); }
-
 	
-	fpvar.islossless = 1;
 	while (! stat) {
-	    fp_pack_hdu (infptr, outfptr, fpvar, &stat);
+
+	    fp_pack_hdu (infptr, outfptr, fpvar, islossless, &stat);
 
 	    if (fpvar.do_checksums) {
 	        fits_write_chksum (outfptr, &stat);
@@ -441,13 +650,13 @@ fp_pack (char *infits, char *outfits, fpstate fpvar)
 	fits_close_file (infptr, &stat);
 
 	if (stat) { fits_report_error (stderr, stat); exit (stat); }
-	return;
+	return(0);
 }
 
 /*--------------------------------------------------------------------------*/
 /* fp_unpack assumes the output file does not exist
  */
-fp_unpack (char *infits, char *outfits, fpstate fpvar)
+int fp_unpack (char *infits, char *outfits, fpstate fpvar)
 {
         fitsfile *infptr, *outfptr;
         int     stat=0;
@@ -480,13 +689,13 @@ fp_unpack (char *infits, char *outfits, fpstate fpvar)
         fits_close_file (infptr, &stat);
 
         if (stat) { fits_report_error (stderr, stat); exit (stat); }
-	return;
+	return(0);
 }
 
 /*--------------------------------------------------------------------------*/
 /* fp_test assumes the output files do not exist
  */
-fp_test (char *infits, char *outfits, char *outfits2, fpstate fpvar)
+int fp_test (char *infits, char *outfits, char *outfits2, fpstate fpvar)
 {
 	fitsfile *inputfptr, *infptr, *outfptr, *outfptr2, *tempfile;
 
@@ -494,7 +703,7 @@ fp_test (char *infits, char *outfits, char *outfits2, fpstate fpvar)
 	long	tilesize[9] = {0,1,1,1,1,1,1,1,1};
 	int	stat=0, totpix=0, naxis=0, ii, hdutype, bitpix, extnum = 0, len;
 	int     tstatus = 0, hdunum, rescale_flag;
-	char	dtype[8], dimen[100], tempfilename[30];
+	char	dtype[8], dimen[100];
 	double  bscale, rescale;
 	long headstart, datastart, dataend;
 	float origdata = 0., whole_cpu, whole_elapse, row_elapse, row_cpu;
@@ -544,8 +753,8 @@ fp_test (char *infits, char *outfits, char *outfits2, fpstate fpvar)
 			  /* all the criteria are met, so create a temporary file that */
 			  /* contains a rescaled version of the image */
 			  
-			  strcpy (tempfilename, "fptmp.XXXXXX"); mktemp (tempfilename);
-			  fits_create_file(&tempfile, tempfilename, &stat);
+			  strcpy (tempfilename3, "fptmp.XXXXXX"); mktemp (tempfilename3);
+			  fits_create_file(&tempfile, tempfilename3, &stat);
 
 			  fits_get_hdu_num(inputfptr, &hdunum);
 			  if (hdunum != 1) {
@@ -646,7 +855,11 @@ fp_test (char *infits, char *outfits, char *outfits2, fpstate fpvar)
 		fits_set_compression_type (outfptr, GZIP_1, &stat);
 		fits_set_tile_dim (outfptr, 6, fpvar.ntile, &stat);
 		fp_test_hdu(infptr, outfptr, outfptr2, fpvar, &stat);
-
+/*
+		fits_set_compression_type (outfptr, PLIO_1, &stat);
+		fits_set_tile_dim (outfptr, 6, fpvar.ntile, &stat);
+		fp_test_hdu(infptr, outfptr, outfptr2, fpvar, &stat);
+*/
                 if (bitpix == SHORT_IMG || bitpix == LONG_IMG) {
 		  fits_set_compression_type (outfptr, NOCOMPRESS, &stat);
 		  fits_set_tile_dim (outfptr, 6, fpvar.ntile, &stat);
@@ -657,9 +870,10 @@ fp_test (char *infits, char *outfits, char *outfits2, fpstate fpvar)
 		    fprintf(outreport,"\n");
 
 		/* delete the temporary file */
-		if (rescale_flag)   
+		if (rescale_flag)  { 
 		    fits_delete_file (infptr, &stat);
-
+		    tempfilename3[0] = '\0';   /* clear the temp filename */ 
+                }
 	    } else {
 		fits_copy_hdu (inputfptr, outfptr, 0, &stat);
 		fits_copy_hdu (inputfptr, outfptr2, 0, &stat);
@@ -679,10 +893,11 @@ fp_test (char *infits, char *outfits, char *outfits2, fpstate fpvar)
 	if (stat) {
 	  fits_report_error (stderr, stat);
 	}
-	return;
+	return(0);
 }
 /*--------------------------------------------------------------------------*/
-fp_pack_hdu (fitsfile *infptr, fitsfile *outfptr, fpstate fpvar, int *status)
+int fp_pack_hdu (fitsfile *infptr, fitsfile *outfptr, fpstate fpvar,
+   int *islossless, int *status)
 {
 	fitsfile *tempfile;
 	long	naxes[9] = {1, 1, 1, 1, 1, 1, 1, 1, 1};
@@ -690,7 +905,7 @@ fp_pack_hdu (fitsfile *infptr, fitsfile *outfptr, fpstate fpvar, int *status)
 	int	tstatus, hdunum, rescale_flag = 0;
 	double  bscale, rescale;
 
-	if (*status) return;
+	if (*status) return(0);
 
 	fits_get_hdu_type (infptr, &hdutype, &stat);
 
@@ -724,7 +939,8 @@ fp_pack_hdu (fitsfile *infptr, fitsfile *outfptr, fpstate fpvar, int *status)
 			  /* all the criteria are met, so create a temporary file that */
 			  /* contains a rescaled version of the image */
 			  
-			  fits_create_file(&tempfile, "!fptmpqqqq.qqqr", &stat);
+			  strcpy (tempfilename3, "fptmp.XXXXXX"); mktemp (tempfilename3);
+			  fits_create_file(&tempfile, tempfilename3, &stat);
 
 			  fits_get_hdu_num(infptr, &hdunum);
 			  if (hdunum != 1) {
@@ -757,6 +973,7 @@ fp_pack_hdu (fitsfile *infptr, fitsfile *outfptr, fpstate fpvar, int *status)
 		if (rescale_flag) {
 		    fits_img_compress (tempfile, outfptr, &stat);
 		    fits_delete_file  (tempfile, &stat);
+		    tempfilename3[0] = '\0';   /* clear the temp filename */
 		} else {
 		    fits_img_compress (infptr, outfptr, &stat);
 		}
@@ -765,20 +982,20 @@ fp_pack_hdu (fitsfile *infptr, fitsfile *outfptr, fpstate fpvar, int *status)
 		    (fpvar.comptype == HCOMPRESS_1 && fpvar.scale != 0.)) {
 
 		    /* compressed image is not identical to original */
-		    fpvar.islossless = 0;  
+		    *islossless = 0;  
 		}
 	}
 
 	*status = stat;
-	return;
+	return(0);
 }
 
 /*--------------------------------------------------------------------------*/
-fp_unpack_hdu (fitsfile *infptr, fitsfile *outfptr, int *status)
+int fp_unpack_hdu (fitsfile *infptr, fitsfile *outfptr, int *status)
 {
         int stat=0;
 
-        if (*status) return;
+        if (*status) return(0);
 
         if (fits_is_compressed_image (infptr,  &stat))
             fits_img_decompress (infptr, outfptr, &stat);
@@ -786,7 +1003,7 @@ fp_unpack_hdu (fitsfile *infptr, fitsfile *outfptr, int *status)
             fits_copy_hdu (infptr, outfptr, 0, &stat);
 
         *status = stat;
-	return;
+	return(0);
 }
 /*--------------------------------------------------------------------------*/
 int fits_read_image_speed (fitsfile *infptr, float *whole_elapse, 
@@ -951,7 +1168,7 @@ int fits_read_image_speed (fitsfile *infptr, float *whole_elapse,
 	return(*status);
 }
 /*--------------------------------------------------------------------------*/
-fp_test_hdu (fitsfile *infptr, fitsfile *outfptr, fitsfile *outfptr2, 
+int fp_test_hdu (fitsfile *infptr, fitsfile *outfptr, fitsfile *outfptr2, 
 	fpstate fpvar, int *status)
 {
 
@@ -963,7 +1180,7 @@ fp_test_hdu (fitsfile *infptr, fitsfile *outfptr, fitsfile *outfptr2,
 	float elapse, whole_elapse, row_elapse, whole_cpu, row_cpu;
 	unsigned long datasum1, datasum2, hdusum;
 
-	if (*status) return;
+	if (*status) return(0);
 
 	origdata = 0;
 	compressdata = 0;
@@ -1062,15 +1279,17 @@ fp_test_hdu (fitsfile *infptr, fitsfile *outfptr, fitsfile *outfptr2,
 	if (stat == DATA_COMPRESSION_ERR) stat = 0;
 
 	*status = stat;
+        return(0);
 }
 
 /*--------------------------------------------------------------------------*/
 int marktime(int *status)
 {
         struct  timeval tv;
-        struct  timezone tz;
+/*        struct  timezone tz; */
 
-        gettimeofday (&tv, &tz);
+/*        gettimeofday (&tv, &tz); */
+        gettimeofday (&tv, NULL);
 
 	startsec = tv.tv_sec;
         startmilli = tv.tv_usec/1000;
@@ -1083,11 +1302,12 @@ int marktime(int *status)
 int gettime(float *elapse, float *elapscpu, int *status)
 {
         struct  timeval tv;
-        struct  timezone tz;
+/*        struct  timezone tz; */
 	int stopmilli;
 	long stopsec;
 
-        gettimeofday (&tv, &tz);
+/*        gettimeofday (&tv, &tz); */
+        gettimeofday (&tv, NULL);
 	ecpu = clock();
 
         stopmilli = tv.tv_usec/1000;
@@ -1452,4 +1672,22 @@ int fp_i4rescale(fitsfile *infptr, int naxis, long *naxes, double rescale,
 
 	free(intarray);
 	return(*status);
+}
+/* ========================================================================
+ * Signal and error handler.
+ */
+void abort_fpack(int sig)
+{
+     /* clean up by deleting temporary files */
+     
+      if (tempfilename[0]) {
+         remove(tempfilename);
+      }
+      if (tempfilename2[0]) {
+         remove(tempfilename2);
+      }
+      if (tempfilename3[0]) {
+         remove(tempfilename3);
+      }
+      exit(-1); 
 }
