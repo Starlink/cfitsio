@@ -60,12 +60,14 @@ float ffvers(float *version)  /* IO - version number */
   return the current version number of the FITSIO software
 */
 {
-      *version = (float) 3.06;
+      *version = (float) 3.08;
 
-/*     27 August 2007
+/*     15 April 2008 (internal release)
 
    Previous releases:
-      *version = 3.05    12 Jul 2007  (internal release only)
+      *version = 3.07     5 Nov 2007  (internal release)
+      *version = 3.06    27 Aug 2007  
+      *version = 3.05    12 Jul 2007  (internal release)
       *version = 3.03    11 Dec 2006
       *version = 3.02    18 Sep 2006
       *version = 3.01       May 2006 included in FTOOLS 6.1 release
@@ -1316,10 +1318,13 @@ int ffpsvc(char *card,    /* I - FITS header card (nominally 80 bytes long) */
 
         if (ii == cardlen)
         {
-            value[jj] = '\0';  /*  terminate the bad value string  */
+            jj = minvalue(jj, 69);  /* don't exceed 70 char string length */
+            value[jj] = '\'';  /*  close the bad value string  */
+            value[jj+1] = '\0';  /*  terminate the bad value string  */
             ffpmsg("This keyword string value has no closing quote:");
             ffpmsg(card);
-            return(*status = NO_QUOTE);
+	    /*  May 2008 - modified to not fail on this minor error  */
+/*            return(*status = NO_QUOTE);  */
         }
         else
         {
@@ -4189,6 +4194,8 @@ int ffpinit(fitsfile *fptr,      /* I - FITS file pointer */
     if (naxis > 0 && naxes[0] == 0)  /* test for 'random groups' */
     {
         tstatus = 0;
+        ffmaky(fptr, 2, status);         /* reset to beginning of header */
+
         if (ffgkyl(fptr, "GROUPS", &groups, comm, &tstatus))
             groups = 0;          /* GROUPS keyword not found */
     }
@@ -4225,6 +4232,7 @@ int ffpinit(fitsfile *fptr,      /* I - FITS file pointer */
     }
         
     /*   calculate the size of the primary array  */
+    (fptr->Fptr)->imgdim = naxis;
     if (naxis == 0)
     {
         npix = 0;
@@ -4240,9 +4248,11 @@ int ffpinit(fitsfile *fptr,      /* I - FITS file pointer */
             npix = naxes[0];
         }
 
+        (fptr->Fptr)->imgnaxis[0] = naxes[0];
         for (ii=1; ii < naxis; ii++)
         {
             npix = npix*naxes[ii];   /* calc number of pixels in the array */
+            (fptr->Fptr)->imgnaxis[ii] = naxes[ii];
         }
     }
 
@@ -4270,6 +4280,20 @@ int ffpinit(fitsfile *fptr,      /* I - FITS file pointer */
         (fptr->Fptr)->rowlength = 0;    /* rows have zero length */
         (fptr->Fptr)->tfield = 0;       /* table has no fields   */
 
+        /* free the tile-compressed image cache, if it exists */
+        if ((fptr->Fptr)->tiledata) {
+	       free((fptr->Fptr)->tiledata);
+	       (fptr->Fptr)->tiledata = 0;
+	       (fptr->Fptr)->tilerow = 0;
+	       (fptr->Fptr)->tiledatasize = 0;
+	       (fptr->Fptr)->tiletype = 0;
+        }
+
+        if ((fptr->Fptr)->tilenullarray) {
+	       free((fptr->Fptr)->tilenullarray);
+	       (fptr->Fptr)->tilenullarray = 0;
+        }
+
         if ((fptr->Fptr)->tableptr)
            free((fptr->Fptr)->tableptr); /* free memory for the old CHDU */
 
@@ -4292,6 +4316,22 @@ int ffpinit(fitsfile *fptr,      /* I - FITS file pointer */
 
         (fptr->Fptr)->rowlength = (npix + pcount) * bytlen; /* total size */
         (fptr->Fptr)->tfield = 2;  /* 2 fields: group params and the image */
+
+        /* free the tile-compressed image cache, if it exists */
+
+        /* free the tile-compressed image cache, if it exists */
+        if ((fptr->Fptr)->tiledata) {
+	       free((fptr->Fptr)->tiledata);
+	       (fptr->Fptr)->tiledata = 0;
+	       (fptr->Fptr)->tilerow = 0;
+	       (fptr->Fptr)->tiledatasize = 0;
+	       (fptr->Fptr)->tiletype = 0;
+        }
+
+        if ((fptr->Fptr)->tilenullarray) {
+	       free((fptr->Fptr)->tilenullarray);
+	       (fptr->Fptr)->tilenullarray = 0;
+        }
 
         if ((fptr->Fptr)->tableptr)
            free((fptr->Fptr)->tableptr); /* free memory for the old CHDU */
@@ -4373,6 +4413,21 @@ int ffainit(fitsfile *fptr,      /* I - FITS file pointer */
 
     (fptr->Fptr)->rowlength = rowlen; /* store length of a row */
     (fptr->Fptr)->tfield = tfield; /* store number of table fields in row */
+
+     /* free the tile-compressed image cache, if it exists */
+     if ((fptr->Fptr)->tiledata) {
+	       free((fptr->Fptr)->tiledata);
+	       (fptr->Fptr)->tiledata = 0;
+	       (fptr->Fptr)->tilerow = 0;
+	       (fptr->Fptr)->tiledatasize = 0;
+	       (fptr->Fptr)->tiletype = 0;
+     }
+
+     if ((fptr->Fptr)->tilenullarray) {
+	       free((fptr->Fptr)->tilenullarray);
+	       (fptr->Fptr)->tilenullarray = 0;
+     }
+
 
     if ((fptr->Fptr)->tableptr)
        free((fptr->Fptr)->tableptr); /* free memory for the old CHDU */
@@ -4551,6 +4606,21 @@ int ffbinit(fitsfile *fptr,     /* I - FITS file pointer */
 
     (fptr->Fptr)->rowlength =  rowlen; /* store length of a row */
     (fptr->Fptr)->tfield = tfield; /* store number of table fields in row */
+
+
+    /* free the tile-compressed image cache, if it exists */
+    if ((fptr->Fptr)->tiledata) {
+	       free((fptr->Fptr)->tiledata);
+	       (fptr->Fptr)->tiledata = 0;
+	       (fptr->Fptr)->tilerow = 0;
+	       (fptr->Fptr)->tiledatasize = 0;
+	       (fptr->Fptr)->tiletype = 0;
+    }
+
+    if ((fptr->Fptr)->tilenullarray) {
+	       free((fptr->Fptr)->tilenullarray);
+	       (fptr->Fptr)->tilenullarray = 0;
+    }
 
     if ((fptr->Fptr)->tableptr)
        free((fptr->Fptr)->tableptr); /* free memory for the old CHDU */
@@ -5743,6 +5813,8 @@ int ffcmph(fitsfile *fptr,  /* I -FITS file pointer                         */
     }
 
     /* update the PCOUNT value (size of heap) */
+    ffmaky(fptr, 2, status);         /* reset to beginning of header */
+
     ffgkyjj(fptr, "PCOUNT", &pcount, comm, status);
     if ((fptr->Fptr)->heapsize != pcount)
     {
@@ -5847,6 +5919,7 @@ int ffgdesll(fitsfile *fptr,   /* I - FITS file pointer                       */
              *heapaddr = descript8[1]; /* 2nd word is the address */
         }
     }     
+
     return(*status);
 }
 /*--------------------------------------------------------------------------*/
@@ -6111,8 +6184,11 @@ int ffchdu(fitsfile *fptr,      /* I - FITS file pointer */
     else if ((fptr->Fptr)->writemode == 1)
     {
         ffrdef(fptr, status);  /* scan header to redefine structure */
-        if ((fptr->Fptr)->heapsize > 0)
+
+        if ((fptr->Fptr)->heapsize > 0) {
           ffuptf(fptr, status);  /* update the variable length TFORM values */
+        }
+	
         ffpdfl(fptr, status);  /* insure correct data file values */
     }
 
@@ -6123,6 +6199,20 @@ int ffchdu(fitsfile *fptr,      /* I - FITS file pointer */
         {
             free((fptr->Fptr)->tableptr);
            (fptr->Fptr)->tableptr = NULL;
+
+            /* free the tile-compressed image cache, if it exists */
+            if ((fptr->Fptr)->tiledata) {
+	       free((fptr->Fptr)->tiledata);
+	       (fptr->Fptr)->tiledata = 0;
+	       (fptr->Fptr)->tilerow = 0;
+	       (fptr->Fptr)->tiledatasize = 0;
+	       (fptr->Fptr)->tiletype = 0;
+            }
+
+            if ((fptr->Fptr)->tilenullarray) {
+	       free((fptr->Fptr)->tilenullarray);
+	       (fptr->Fptr)->tilenullarray = 0;
+            }
         }
     }
 
@@ -6151,8 +6241,9 @@ int ffuptf(fitsfile *fptr,      /* I - FITS file pointer */
     char card[FLEN_CARD];
     char message[FLEN_ERRMSG];
 
-    ffgkyj(fptr, "TFIELDS", &tflds, comment, status);
+    ffmaky(fptr, 2, status);         /* reset to beginning of header */
     ffgkyjj(fptr, "NAXIS2", &naxis2, comment, status);
+    ffgkyj(fptr, "TFIELDS", &tflds, comment, status);
 
     for (ii = 1; ii <= tflds; ii++)        /* loop over all the columns */
     {
@@ -6174,6 +6265,7 @@ int ffuptf(fitsfile *fptr,      /* I - FITS file pointer */
           for (jj=1; jj <= naxis2; jj++)
           {
             ffgdesll(fptr, ii, jj, &length, &addr, status);
+
 	    if (length > maxlen)
 	         maxlen = length;
           }
@@ -6231,6 +6323,7 @@ int ffrdef(fitsfile *fptr,      /* I - FITS file pointer */
           /* and if the user has not explicitly reset the NAXIS2 value */
           if ((fptr->Fptr)->hdutype != IMAGE_HDU)
           {
+            ffmaky(fptr, 2, status);
             if (ffgkyjj(fptr, "NAXIS2", &naxis2, comm, &tstatus) > 0)
             {
                 /* Couldn't read NAXIS2 (odd!);  in certain circumstances */
@@ -6261,6 +6354,7 @@ int ffrdef(fitsfile *fptr,      /* I - FITS file pointer */
           /* binary table, then we may need to update the PCOUNT value */
           if ((fptr->Fptr)->heapsize > 0)
           {
+            ffmaky(fptr, 2, status);
             ffgkyjj(fptr, "PCOUNT", &pcount, comm, status);
             if ((fptr->Fptr)->heapsize > pcount)
             {
@@ -6874,6 +6968,9 @@ int ffgidt( fitsfile *fptr,  /* I - FITS file pointer                       */
         if ( ffrdef(fptr, status) > 0)               /* rescan header */
             return(*status);
 
+    /* reset to beginning of header */
+    ffmaky(fptr, 1, status);  /* simply move to beginning of header */
+
     if ((fptr->Fptr)->hdutype == IMAGE_HDU)
     {
         ffgky(fptr, TINT, "BITPIX", imgtype, NULL, status);
@@ -6913,19 +7010,12 @@ int ffgiet( fitsfile *fptr,  /* I - FITS file pointer                       */
         if ( ffrdef(fptr, status) > 0)               /* rescan header */
             return(*status);
 
+    /* reset to beginning of header */
+    ffmaky(fptr, 2, status);  /* simply move to beginning of header */
+
     if ((fptr->Fptr)->hdutype == IMAGE_HDU)
     {
         ffgky(fptr, TINT, "BITPIX", imgtype, NULL, status);
-        tstatus = 0;
-        ffgky(fptr, TDOUBLE, "BSCALE", &bscale, NULL, &tstatus);
-        if (tstatus)
-           bscale = 1.0;
-
-        tstatus = 0;
-        ffgky(fptr, TDOUBLE, "BZERO", &bzero, NULL, &tstatus);
-        if (tstatus)
-           bzero = 0.0;
-
     }
     else if ((fptr->Fptr)->compressimg)
     {
@@ -6941,14 +7031,14 @@ int ffgiet( fitsfile *fptr,  /* I - FITS file pointer                       */
 
     /* check if the BSCALE and BZERO keywords are defined, which might
        change the effective datatype of the image  */
-        tstatus = 0;
-        ffgky(fptr, TDOUBLE, "BSCALE", &bscale, NULL, &tstatus);
-        if (tstatus)
+    tstatus = 0;
+    ffgky(fptr, TDOUBLE, "BSCALE", &bscale, NULL, &tstatus);
+    if (tstatus)
            bscale = 1.0;
 
-        tstatus = 0;
-        ffgky(fptr, TDOUBLE, "BZERO", &bzero, NULL, &tstatus);
-        if (tstatus)
+    tstatus = 0;
+    ffgky(fptr, TDOUBLE, "BZERO", &bzero, NULL, &tstatus);
+    if (tstatus)
            bzero = 0.0;
 
     if (bscale == 1.0 && bzero == 0.0)  /* no scaling */
@@ -7028,6 +7118,7 @@ int ffgidm( fitsfile *fptr,  /* I - FITS file pointer                       */
 /*
   Get the dimension of the image (= NAXIS keyword for normal image, or
   ZNAXIS for a compressed image)
+  These values are cached for faster access.
 */
 {
     if (*status > 0)
@@ -7042,12 +7133,11 @@ int ffgidm( fitsfile *fptr,  /* I - FITS file pointer                       */
 
     if ((fptr->Fptr)->hdutype == IMAGE_HDU)
     {
-        ffgky(fptr, TINT, "NAXIS", naxis, NULL, status);
+        *naxis = (fptr->Fptr)->imgdim;
     }
     else if ((fptr->Fptr)->compressimg)
     {
-        /* this is a binary table containing a compressed image */
-        ffgky(fptr, TINT, "ZNAXIS", naxis, NULL, status);
+        *naxis = (fptr->Fptr)->zndim;
     }
     else
     {
@@ -7064,10 +7154,11 @@ int ffgisz( fitsfile *fptr,  /* I - FITS file pointer                       */
 /*
   Get the size of the image dimensions (= NAXISn keywords for normal image, or
   ZNAXISn for a compressed image)
+  These values are cached for faster access.
+
 */
 {
     int ii, naxis;
-    char keyroot[FLEN_KEYWORD], keyname[FLEN_KEYWORD];
 
     if (*status > 0)
         return(*status);
@@ -7081,30 +7172,23 @@ int ffgisz( fitsfile *fptr,  /* I - FITS file pointer                       */
 
     if ((fptr->Fptr)->hdutype == IMAGE_HDU)
     {
-        strcpy(keyroot, "NAXIS");
+        naxis = minvalue((fptr->Fptr)->imgdim, nlen);
+        for (ii = 0; ii < naxis; ii++)
+        {
+            naxes[ii] = (long) (fptr->Fptr)->imgnaxis[ii];
+        }
     }
     else if ((fptr->Fptr)->compressimg)
     {
-        /* this is a binary table containing a compressed image */
-        strcpy(keyroot, "ZNAXIS");
+        naxis = minvalue( (fptr->Fptr)->zndim, nlen);
+        for (ii = 0; ii < naxis; ii++)
+        {
+            naxes[ii] = (long) (fptr->Fptr)->znaxis[ii];
+        }
     }
     else
     {
-        return(*status = NOT_IMAGE);
-    }
-
-    /* initialize to 1 */
-    for (ii = 0; ii < nlen; ii++)
-        naxes[ii] = 1;
-
-    /* get number of dimensions */
-    fits_get_img_dim(fptr, &naxis, status);
-    naxis = minvalue(naxis, nlen);
-
-    for (ii = 0; ii < naxis; ii++)
-    {
-        ffkeyn(keyroot, ii + 1, keyname, status);
-        ffgkyj(fptr, keyname, naxes + ii, NULL, status);
+        *status = NOT_IMAGE;
     }
 
     return(*status);
@@ -7120,7 +7204,6 @@ int ffgiszll( fitsfile *fptr,  /* I - FITS file pointer                     */
 */
 {
     int ii, naxis;
-    char keyroot[FLEN_KEYWORD], keyname[FLEN_KEYWORD];
 
     if (*status > 0)
         return(*status);
@@ -7134,30 +7217,23 @@ int ffgiszll( fitsfile *fptr,  /* I - FITS file pointer                     */
 
     if ((fptr->Fptr)->hdutype == IMAGE_HDU)
     {
-        strcpy(keyroot, "NAXIS");
+        naxis = minvalue((fptr->Fptr)->imgdim, nlen);
+        for (ii = 0; ii < naxis; ii++)
+        {
+            naxes[ii] = (fptr->Fptr)->imgnaxis[ii];
+        }
     }
     else if ((fptr->Fptr)->compressimg)
     {
-        /* this is a binary table containing a compressed image */
-        strcpy(keyroot, "ZNAXIS");
+        naxis = minvalue( (fptr->Fptr)->zndim, nlen);
+        for (ii = 0; ii < naxis; ii++)
+        {
+            naxes[ii] = (fptr->Fptr)->znaxis[ii];
+        }
     }
     else
     {
-        return(*status = NOT_IMAGE);
-    }
-
-    /* initialize to 1 */
-    for (ii = 0; ii < nlen; ii++)
-        naxes[ii] = 1;
-
-    /* get number of dimensions */
-    fits_get_img_dim(fptr, &naxis, status);
-    naxis = minvalue(naxis, nlen);
-
-    for (ii = 0; ii < naxis; ii++)
-    {
-        ffkeyn(keyroot, ii + 1, keyname, status);
-        ffgkyjj(fptr, keyname, naxes + ii, NULL, status);
+        *status = NOT_IMAGE;
     }
 
     return(*status);
@@ -7301,6 +7377,7 @@ int ffmnhd(fitsfile *fptr,      /* I - FITS file pointer                    */
         /* matching type? */
         if (exttype == ANY_HDU || hdutype == exttype || hdutype == alttype)
         {
+          ffmaky(fptr, 2, status);
           if (ffgkys(fptr, "EXTNAME", extname, 0, &tstatus) > 0) /* name */
           {
                tstatus = 0;
