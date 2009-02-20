@@ -119,9 +119,13 @@
 
    Once the file is closed then the socket is closed.
 
-$Id: drvrnet.c,v 3.45 2005/12/21 18:18:01 pence Exp $
+$Id: drvrnet.c,v 3.48 2007/08/27 18:47:42 pence Exp $
 
 $Log: drvrnet.c,v $
+Revision 3.48  2007/08/27 18:47:42  pence
+new version 3.060 of CFITSIO;  includes better support for tile-compressed
+images and for the full set of WCS keywords in binary tables.
+
 Revision 3.45  2005/12/21 18:18:01  pence
 New beta 3.005 release.  Contains new cfortran.h to support integer*8
 parameters when calling cfitsio from Fortran tasks.  Also has modified

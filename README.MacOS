@@ -1,8 +1,46 @@
-To build the CFITSIO library on Mac OS-X systems, follow the
-instructions for Unix platforms given in the CFITSIO User's Reference
-Guide (cfitsio.doc).
+To build CFITSIO library on an Intel Mac as a Universal Binary
 
-To build the MacOS port on classic Mac OS-9 or earlier:
+Unzip the library:
+- tar xzf cfitsio3060.tar.gz (or whatever version this is)
+
+- cd cfitsio/
+
+- copy the cfitsio-xcodeproj.zip file here
+
+- unzip cfitsio-xcodeproj.zip
+
+- start Xcode and open cfitsio.xcodeproj
+
+- right-click on Targets -> Build PPC -> Build Build PPC
+  when that finishes...:
+
+- right-click on Targets -> Build i386 -> Build Build i386
+  when that finishes...:
+
+- right-click on Targets -> Build Universal -> Build Build Universal
+
+(For some reason clicking on the menu "Build" icon doesn't seem to
+work correctly, but the right-click menus do).
+
+-------------------------------------------------------
+
+Another way to build the universal binary:
+
+- unpack the cfitsio source code tar file
+- cd cfitsio
+- setenv CFLAGS "-arch ppc -arch i386 -g -O2"
+
+ Then proceed with the standard cfitsio build, i.e.:
+
+- ./configure
+- make
+- make install
+
+
+-------------------------------------------------------
+
+Below, are the old (and now obsolete) instuctions for building CFITSIO
+on classic Mac OS-9 or earlier versions:
 
 1. Un binhex and unstuff cfitsio_mac.sit.hqx
 2. put CFitsioPPC.mcp in the cfitsio directory.
@@ -16,16 +54,4 @@ won't work on 68k macs.  Also note that the fortran bindings aren't
 included.  I haven't worked with the codewarrior f2c plugin so I don't know
 how these would work.  If one is interested, please write and I can look
 into this.
-
-bruce.oneel@obs.unige.ch
-
-Modifications...
-
-10/22/98:  pwilson@sewanee.gsfc.nasa.gov
-      New files added for project.  Converted to CodeWarrior Pro 3.
-      The speed test program does not run... complains about a missing library?
-11/09/98:  pwilson@sewanee.gsfc.nasa.gov
-      Fixed speed test problem thanks to Tom Andersen.
-07/17/00:  pwilson@milkyway.gsfc.nasa.gov
-      Updated to CodeWarrior Pro 5 and CFITSIO 2.037.
 
