@@ -4,6 +4,15 @@
 # include <math.h>
 # include "fitsio2.h"
 
+#define NULL_VALUE -2147483647 /* value used to represent undefined pixels */
+#define N_RESERVED_VALUES 1   /* number of reserved values, starting with */
+                               /* and including NULL_VALUE.  These values */
+                               /* may not be used to represent the quantized */
+                               /* and scaled floating point pixel values */
+
+/* nearest integer function */
+# define NINT(x)  ((x >= 0.) ? (int) (x + 0.5) : (int) (x - 0.5))
+
 /*--------------------------------------------------------------------------*/
 int fits_set_compression_type(fitsfile *fptr,  /* I - FITS file pointer     */
        int ctype,    /* image compression type code;                        */
@@ -406,6 +415,7 @@ int imcomp_init_table(fitsfile *outfptr,
     char tf0[4], tf1[4], tf2[4];
     char *tunit[] = {"\0",            "\0",            "\0"  };
     char comm[FLEN_COMMENT];
+    long actual_tilesize[MAX_COMPRESS_DIM]; /* Actual size to use for tiles */
 
     if (*status > 0)
         return(*status);
@@ -421,7 +431,6 @@ int imcomp_init_table(fitsfile *outfptr,
         bitpix = inbitpix;
 
     /* reset default tile dimensions too if required */
-    long actual_tilesize[MAX_COMPRESS_DIM]; // Actual size to use for tiles
     memcpy(actual_tilesize, outfptr->Fptr->request_tilesize, MAX_COMPRESS_DIM * sizeof(long));
 
     if ((outfptr->Fptr)->request_compress_type == HCOMPRESS_1) {
@@ -775,7 +784,7 @@ int imcomp_compress_image (fitsfile *infptr, fitsfile *outfptr, int *status)
 
 */
 {
-    double *tiledata = 0;
+    double *tiledata;
     int anynul, gotnulls = 0, datatype;
     long ii, row;
     int naxis;
@@ -1037,7 +1046,7 @@ int imcomp_compress_tile (fitsfile *outfptr,
   FITS image in most cases.
 */
 {
-    int *idata = 0;		/* quantized integer data */
+    int *idata, *itemp;		/* quantized integer data */
     short *cbuf;	/* compressed data */
     short *sbuff;
     unsigned short *usbuff;
@@ -1053,9 +1062,10 @@ int imcomp_compress_tile (fitsfile *outfptr,
     LONGLONG *lldata;
     signed char *sbbuff;
     unsigned char *usbbuff;
-    int ihcompscale, cn_zblank, zbitpix, nullval, flagval = 0;
-    int intlength = 4;  /* size of integers to be compressed */
+    int ihcompscale, cn_zblank, zbitpix, nullval, flagval, gotnulls;
+    int intlength;  /* size of integers to be compressed */
     float floatnull, hcompscale;
+    float fminval, fmaxval, delta, zeropt, *fdata, *ftemp;
     double doublenull, noise3;
 
     if (*status > 0)
@@ -1425,17 +1435,96 @@ int imcomp_compress_tile (fitsfile *outfptr,
           /* if the tile-compressed table contains zscale and zzero columns */
           /* then scale and quantize the input floating point data.    */
           /* Otherwise, just truncate the floats to (scaled) integers.     */
-          if ((outfptr->Fptr)->cn_zscale > 0)
-          {
+          if ((outfptr->Fptr)->cn_zscale > 0) {
             if (nullcheck == 1)
 	      floatnull = *(float *) (nullflagval);
 	    else
-	      floatnull = FLOATNULLVALUE;
-	      
-            /* quantize the float values into integers */
-            flag = fits_quantize_float ((float *) tiledata, tilenx, tileny,
-               nullcheck, floatnull, (outfptr->Fptr)->quantize_level, idata,
-               bscale, bzero, &iminval, &imaxval);
+	      floatnull = FLOATNULLVALUE;  /* NaNs are represented by this, by default */
+
+	    if ((outfptr->Fptr)->quantize_level < 0)  {
+
+	      /* negative value represents the absolute quantization level. */
+	      /* We don't have to calculate the noise in the image, so do */
+	      /* this simple linear scaling in line (here) for efficiency, */
+	      /* instead of calling fits_quantize_float */
+	    
+	      delta = ((outfptr->Fptr)->quantize_level) * -1.;
+
+	      fdata = tiledata;
+	      gotnulls = 0;
+
+              /* set min and max value = first valid pixel value */
+	      ftemp = fdata;
+	      for (ii = 0; ii < tilelen; ftemp++, ii++) {
+	          if (*fdata != floatnull) {
+	              fminval = *ftemp;
+	              fmaxval = *ftemp;
+		      break;
+		  }
+	      }
+
+              /* find min and max values */
+	      ftemp = fdata;
+	      for (ii = 0; ii < tilelen; ftemp++, ii++) {
+	          if (*ftemp == floatnull) {
+		      gotnulls = 1;
+		  } else if (*ftemp < fminval) {
+		      fminval = *ftemp;
+		  } else if (*ftemp > fmaxval) {
+		      fmaxval = *ftemp;
+		  }
+	      }
+
+              /* check that the range of quantized levels is not > range of int */
+	      if ((fmaxval - fminval) / delta > 2. * 2147483647. - N_RESERVED_VALUES ) {
+	          flag = 0;			/* don't quantize */
+              } else {
+
+                  flag = 1;
+                  if (!gotnulls) {   /* don't have to check for nulls */
+                  /* return all positive values, if possible since some */
+                  /* compression algorithms either only work for positive integers, */
+                  /* or are more efficient.  */
+                      if ((fmaxval - fminval) / delta < 2147483647. - N_RESERVED_VALUES ) {
+                          zeropt = fminval;
+	                  ftemp = fdata;
+			  itemp = idata;
+       	                  for (ii = 0;  ii < tilelen;  ftemp++, itemp++, ii++) {
+	                      *itemp = (int) (((*ftemp - zeropt) / delta) +  0.5f);
+			  }
+                       } else {
+                          /* center the quantized levels around zero */
+                          zeropt = (fminval + fmaxval) / 2.;
+       	                  for (ii = 0;  ii < tilelen;  ii++) {
+	                      idata[ii] = NINT((fdata[ii] - zeropt) / delta);
+			  }
+                      }
+		  } else {
+                      /* data contains null values; shift the range to be */
+                      /* close to the value used to represent null values */
+                     zeropt = fminval - delta * (NULL_VALUE + N_RESERVED_VALUES);
+
+	              for (ii = 0;  ii < tilelen;  ii++) {
+                          if (fdata[ii] != floatnull) {
+	                      idata[ii] = NINT ((fdata[ii] - zeropt) / delta);
+                          } else  {
+                              idata[ii] = NULL_VALUE;
+			  }
+                      }
+	         }
+
+                 /* calc min and max values of the integer array */
+
+	         bscale[0] = delta;
+	         bzero[0]  = zeropt;
+              }
+	    } else {
+                /* quantize level is positive, so we have to calculate the noise */
+                /* quantize the float values into integers */
+                flag = fits_quantize_float ((float *) tiledata, tilenx, tileny,
+                   nullcheck, floatnull, (outfptr->Fptr)->quantize_level, idata,
+                   bscale, bzero, &iminval, &imaxval);
+            }
           }
           else  /* input float data is implicitly converted (truncated) to integers */
           {
@@ -1469,7 +1558,7 @@ int imcomp_compress_tile (fitsfile *outfptr,
           }
           else  /* input double data is implicitly converted (truncated) to integers */
           {
-            if ((scale != 1. || zero != 0.))  /* must scale the values */
+             if ((scale != 1. || zero != 0.))  /* must scale the values */
 	       imcomp_nullscaledoubles((double *) tiledata, tilelen, idata, scale, zero,
 	           nullcheck, *(double *) (nullflagval), nullval, status);
              else
@@ -2219,8 +2308,8 @@ int fits_write_compressed_img(fitsfile *fptr,   /* I - FITS file pointer     */
     int  tstatus, buffpixsiz;
     void *buffer;
     char *bnullarray = 0, card[FLEN_CARD];
-    float floatnull = 0.;
-    double doublenull = 0.;
+    float floatnull;
+    double doublenull;
 
     if (*status > 0) 
         return(*status);
@@ -4074,9 +4163,9 @@ int imcomp_decompress_tile (fitsfile *infptr,
     LONGLONG *lldata;
     size_t idatalen, tilebytesize;
     int ii, tnull;        /* value in the data which represents nulls */
-    unsigned char *cbuf = 0; /* compressed data */
+    unsigned char *cbuf; /* compressed data */
     unsigned char charnull = 0;
-    short *sbuf = 0;
+    short *sbuf;
     short snull = 0;
     int blocksize;
     double bscale, bzero, dummy = 0;    /* scaling parameters */
@@ -4169,6 +4258,19 @@ int imcomp_decompress_tile (fitsfile *infptr,
           ffpmsg("error reading scaling factor and offset for compressed tile");
           return (*status);
         }
+
+        /* test if floating-point FITS image also has non-default BSCALE and  */
+	/* BZERO keywords.  If so, we have to combine the 2 linear scaling factors. */
+	
+	if ( ((infptr->Fptr)->zbitpix == FLOAT_IMG || 
+	      (infptr->Fptr)->zbitpix == DOUBLE_IMG )
+	    &&  
+	      ((infptr->Fptr)->cn_bscale != 1.0 ||
+	       (infptr->Fptr)->cn_bzero  != 0.0 )    ) 
+	    {
+	       bscale = bscale * (infptr->Fptr)->cn_bscale;
+	       bzero  = bzero  * (infptr->Fptr)->cn_bscale + (infptr->Fptr)->cn_bzero;
+	    }
     }
 
     if (bscale == 1.0 && bzero == 0.0 ) 

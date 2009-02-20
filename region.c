@@ -19,11 +19,13 @@ int fits_read_rgnfile( const char *filename,
   fitsfile *fptr;
   int tstatus = 0;
 
-   if( *status ) return( *status );
+  if( *status ) return( *status );
 
   /* try to open as a FITS file - if that doesn't work treat as an ASCII file */
 
+  fits_write_errmark();
   if ( ffopen(&fptr, filename, READONLY, &tstatus) ) {
+    fits_clear_errmark();
     fits_read_ascii_region(filename, wcs, Rgn, status);
   } else {
     fits_read_fits_region(fptr, wcs, Rgn, status);
@@ -47,7 +49,7 @@ int fits_read_ascii_region( const char *filename,
    char     *namePtr, *paramPtr, *currLoc;
    char     *pX, *pY, *endp;
    long     allocLen, lineLen, hh, mm, dd;
-   double   *coords = 0, X, Y, R, x, y, ss, div, xsave= 0., ysave= 0.;
+   double   *coords, X, Y, R, x, y, ss, div, xsave= 0., ysave= 0.;
    int      nParams, nCoords, negdec;
    int      i, done;
    FILE     *rgnFile;
@@ -594,10 +596,11 @@ int fits_read_ascii_region( const char *filename,
 
 error:
 
-   if( *status )
+   if( *status ) {
       fits_free_region( aRgn );
-   else
+   } else {
       *Rgn = aRgn;
+   }
 
    fclose( rgnFile );
    free( currLine );
@@ -616,17 +619,13 @@ int fits_in_region( double    X,
    double x, y, dx, dy, xprime, yprime, r;
    RgnShape *Shapes;
    int i, cur_comp;
-   int result = 0, comp_result = 0;
+   int result, comp_result;
 
    Shapes = Rgn->Shapes;
 
-   /* if an excluded region is given first, then implicitly   */
-   /* assume a previous shape that includes the entire image. */
-   if (!Shapes->sign)
-      result = 1;
-
+   result = 0;
+   comp_result = 0;
    cur_comp = Rgn->Shapes[0].comp;
-   comp_result = result;
 
    for( i=0; i<Rgn->nShapes; i++, Shapes++ ) {
 
@@ -635,10 +634,12 @@ int fits_in_region( double    X,
      /*	the current logical and the total logical. Reinitialize the      */
      /* temporary logical.                                               */
 
-     if ( Shapes->comp != cur_comp ) {
+     if ( i==0 || Shapes->comp != cur_comp ) {
        result = result || comp_result;
-       comp_result = !Shapes->sign;
        cur_comp = Shapes->comp;
+       /* if an excluded region is given first, then implicitly   */
+       /* assume a previous shape that includes the entire image. */
+       comp_result = !Shapes->sign;
      }
 
     /* only need to test if  */
@@ -838,10 +839,11 @@ int fits_in_region( double    X,
       if( !Shapes->sign ) comp_result = !comp_result;
 
      } 
-   }
-   
-   result = result || comp_result;
 
+   }
+
+   result = result || comp_result;
+   
    return( result );
 }
 
@@ -1097,8 +1099,11 @@ void fits_setup_shape ( RgnShape *newShape)
   switch ( newShape->shape ) {
 
   case circle_rgn:
-  case annulus_rgn:
     R = coords[2];
+    break;
+
+  case annulus_rgn:
+    R = coords[3];
     break;
 
   case ellipse_rgn:
@@ -1234,7 +1239,7 @@ int fits_read_fits_region ( fitsfile *fptr,
   long icsize[6];
   double X, Y, R, Theta, Xsave, Ysave, Xpos, Ypos;
   double *coords;
-  char *cvalue;
+  char *cvalue, *cvalue2;
   char comment[FLEN_COMMENT];
   char colname[6][FLEN_VALUE] = {"X", "Y", "SHAPE", "R", "ROTANG", "COMPONENT"};
   char shapename[17][FLEN_VALUE] = {"POINT","CIRCLE","ELLIPSE","ANNULUS",
@@ -1374,21 +1379,22 @@ int fits_read_fits_region ( fitsfile *fptr,
     /* set include or exclude */
 
     newShape->sign = 1;
+    cvalue2 = cvalue;
     if ( !strncmp(cvalue,"!",1) ) {
       newShape->sign = 0;
-      cvalue++;
+      cvalue2++;
     }
 
     /* set the shape type */
 
     for (j=0; j<9; j++) {
-      if ( !strcmp(cvalue, shapename[j]) ) newShape->shape = shapetype[j];
+      if ( !strcmp(cvalue2, shapename[j]) ) newShape->shape = shapetype[j];
     }
 
     /* allocate memory for polygon case and set coords pointer */
 
     if ( newShape->shape == poly_rgn ) {
-      newShape->param.poly.Pts = (double *) malloc (2*icsize[0]*sizeof(double));
+      newShape->param.poly.Pts = (double *) calloc (2*icsize[0], sizeof(double));
       if ( !newShape->param.poly.Pts ) {
 	ffpmsg("Could not allocate memory to hold polygon parameters" );
 	*status = MEMORY_ALLOCATION;
@@ -1400,6 +1406,7 @@ int fits_read_fits_region ( fitsfile *fptr,
       coords = newShape->param.gen.p;
     }
 
+
   /* read X and Y. Polygon and Rectangle require special cases */
 
     npos = 1;
@@ -1407,13 +1414,37 @@ int fits_read_fits_region ( fitsfile *fptr,
     if ( newShape->shape == rectangle_rgn ) npos = 2;
 
     for (j=0; j<npos; j++) {
-      if ( ffgcvd(fptr, icol[0], i, j+1, 1, 0.0, (coords++), &anynul, status) ) {
+      if ( ffgcvd(fptr, icol[0], i, j+1, 1, DOUBLENULLVALUE, coords, &anynul, status) ) {
 	ffpmsg("Failed to read X column for polygon region");
 	goto error;
       }
-      if ( ffgcvd(fptr, icol[1], i, j+1, 1, 0.0, (coords++), &anynul, status) ) {
+      if (*coords == DOUBLENULLVALUE) {  /* check for null value end of array marker */
+        npos = j;
+	newShape->param.poly.nPts = npos * 2;
+	break;
+      }
+      coords++;
+      
+      if ( ffgcvd(fptr, icol[1], i, j+1, 1, DOUBLENULLVALUE, coords, &anynul, status) ) {
 	ffpmsg("Failed to read Y column for polygon region");
 	goto error;
+      }
+      if (*coords == DOUBLENULLVALUE) { /* check for null value end of array marker */
+        npos = j;
+	newShape->param.poly.nPts = npos * 2;
+        coords--;
+	break;
+      }
+      coords++;
+ 
+      if (j == 0) {  /* save the first X and Y coordinate */
+        Xsave = *(coords - 2);
+	Ysave = *(coords - 1);
+      } else if ((Xsave == *(coords - 2)) && (Ysave == *(coords - 1)) ) {
+        /* if point has same coordinate as first point, this marks the end of the array */
+        npos = j + 1;
+	newShape->param.poly.nPts = npos * 2;
+	break;
       }
     }
 
@@ -1534,6 +1565,7 @@ int fits_read_fits_region ( fitsfile *fptr,
     } else {
       newShape->comp = 1;
     }
+
 
     /* do some precalculations to speed up tests */
 

@@ -315,7 +315,7 @@ int ffgky( fitsfile *fptr,     /* I - FITS file pointer        */
     {
         if (ffgkyj(fptr, keyname, &longval, comm, status) <= 0)
         {
-            if (longval > USHRT_MAX || longval < 0)
+            if (longval > (long) USHRT_MAX || longval < 0)
                 *status = NUM_OVERFLOW;
             else
                 *(unsigned short *) value = (unsigned short) longval;
@@ -3073,7 +3073,9 @@ int ffhdr2str( fitsfile *fptr,  /* I - FITS file pointer                    */
     if (ffghsp(fptr, &totkeys, NULL, status) > 0)
         return(*status);
 
-    /* allocate memory for all the keywords (multiple of 2880 bytes) */
+    /* allocate memory for all the keywords */
+    /* (will reallocate it later to minimize the memory size) */
+    
     *header = (char *) calloc ( (totkeys + 1) * 80 + 1, 1);
     if (!(*header))
     {

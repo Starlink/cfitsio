@@ -11,6 +11,12 @@
 #include <time.h>
 #include <stdlib.h>
 
+/* these filename buffer are used to delete temporary files */
+/* in case the program is aborted */
+char tempfilename[SZ_STR];    
+char tempfilename2[SZ_STR];
+char tempfilename3[SZ_STR];
+
 /* nearest integer function */
 # define NINT(x)  ((x >= 0.) ? (int) (x + 0.5) : (int) (x - 0.5))
 # define NSHRT(x) ((x >= 0.) ? (short) (x + 0.5) : (short) (x - 0.5))
@@ -249,8 +255,8 @@ int fp_preflight (int argc, char *argv[], int unpack, fpstate *fpptr)
 		    }
 	      }
 
-              /* if writing to stdout or just testing, then we are all done */
-	      if (fpptr->to_stdout || fpptr->test_all) {
+              /* if writing to stdout, then we are all done */
+	      if (fpptr->to_stdout) {
                       continue;
 	      }
 
@@ -375,7 +381,7 @@ int fp_preflight (int argc, char *argv[], int unpack, fpstate *fpptr)
  */
 int fp_loop (int argc, char *argv[], int unpack, fpstate fpvar)
 {
-	char	infits[SZ_STR], outfits[SZ_STR], outfits2[SZ_STR];
+	char	infits[SZ_STR], outfits[SZ_STR];
 	char	temp[SZ_STR], answer[30], *cptr;
 	int	iarg, islossless, namelen;
         
@@ -391,6 +397,11 @@ int fp_loop (int argc, char *argv[], int unpack, fpstate fpvar)
 		fprintf(outreport," Filename Extension BITPIX NAXIS1 NAXIS2 Size N_nulls Minval Maxval Mean Sigm Noise1 Noise3 T_whole T_rowbyrow ");
 		fprintf(outreport,"[Comp_ratio, Pack_cpu, Unpack_cpu, Lossless readtimes] (repeated for Rice, Hcompress and GZIP)\n");
 	}
+
+
+	tempfilename[0] = '\0';
+	tempfilename2[0] = '\0';
+	tempfilename3[0] = '\0';
 
 /* set up signal handler to delete temporary file on abort */	    
 #ifdef SIGINT
@@ -433,7 +444,7 @@ int fp_loop (int argc, char *argv[], int unpack, fpstate fpvar)
               } else if (fpvar.outfile[0]) {  /* user specified output file name */
 	          strcpy(outfits, fpvar.outfile);
 
-	      } else if (! fpvar.test_all) {
+	      } else {
 	          /* construct output file name */
 	          if (fpvar.prefix[0]) {
 	              strcat(outfits,fpvar.prefix);
@@ -498,6 +509,7 @@ int fp_loop (int argc, char *argv[], int unpack, fpstate fpvar)
 			fp_msg (" already exists\n"); exit (-1);
 		    }
 		}
+                strcpy(tempfilename, outfits);  /* store temp file name, in case of abort */
 	    }
 
 
@@ -508,14 +520,16 @@ int fp_loop (int argc, char *argv[], int unpack, fpstate fpvar)
 		
 	    if (fpvar.test_all) {   /* compare all the algorithms */
 
-		strcpy (outfits,  "fpack_tmp.XXXXXX"); mktemp (outfits);
-		strcpy (outfits2, "fpack_tmp.XXXXXX"); mktemp (outfits2);
+		strcpy (tempfilename,  "fpack_tmp.XXXXXX"); mktemp (tempfilename);
+		strcpy (tempfilename2, "fpack_tmp.XXXXXX"); mktemp (tempfilename2);
 
-		fp_test (infits, outfits, outfits2, fpvar);
+		fp_test (infits, tempfilename, tempfilename2, fpvar);
 
-		remove(outfits);
-		remove(outfits2);
-                return(0);
+		remove(tempfilename);
+                tempfilename[0] = '\0';   /* clear the temp file name */
+		remove(tempfilename2);
+                tempfilename2[0] = '\0';
+                continue;
 
 	    } else if (unpack) {
 		fp_unpack (infits, outfits, fpvar);
@@ -525,7 +539,7 @@ int fp_loop (int argc, char *argv[], int unpack, fpstate fpvar)
 	    }
 
 	    if (fpvar.to_stdout) {
-		return(0);
+		continue;
 	    }
 
             /* ********** clobber and/or delete files, if needed ************** */
@@ -541,7 +555,7 @@ int fp_loop (int argc, char *argv[], int unpack, fpstate fpvar)
 		    if (answer[0] != 'Y' && answer[0] != 'y') {
 		        fp_msg ("\noriginal file NOT overwritten!\n");
 			remove(outfits);
-                        break;
+                        continue;
 		    }
 		}
  
@@ -550,6 +564,7 @@ int fp_loop (int argc, char *argv[], int unpack, fpstate fpvar)
 		        fp_msg ("\nError renaming tmp file to ");
 		        fp_msg (temp); fp_msg ("\n"); exit (-1);
 		}
+		tempfilename[0] = '\0';  /* clear temporary file name */
                 strcpy(outfits, temp);
 
 	    } else if (fpvar.clobber || fpvar.delete_input) {      /* delete the input file */
@@ -688,7 +703,7 @@ int fp_test (char *infits, char *outfits, char *outfits2, fpstate fpvar)
 	long	tilesize[9] = {0,1,1,1,1,1,1,1,1};
 	int	stat=0, totpix=0, naxis=0, ii, hdutype, bitpix, extnum = 0, len;
 	int     tstatus = 0, hdunum, rescale_flag;
-	char	dtype[8], dimen[100], tempfilename[30];
+	char	dtype[8], dimen[100];
 	double  bscale, rescale;
 	long headstart, datastart, dataend;
 	float origdata = 0., whole_cpu, whole_elapse, row_elapse, row_cpu;
@@ -738,8 +753,8 @@ int fp_test (char *infits, char *outfits, char *outfits2, fpstate fpvar)
 			  /* all the criteria are met, so create a temporary file that */
 			  /* contains a rescaled version of the image */
 			  
-			  strcpy (tempfilename, "fptmp.XXXXXX"); mktemp (tempfilename);
-			  fits_create_file(&tempfile, tempfilename, &stat);
+			  strcpy (tempfilename3, "fptmp.XXXXXX"); mktemp (tempfilename3);
+			  fits_create_file(&tempfile, tempfilename3, &stat);
 
 			  fits_get_hdu_num(inputfptr, &hdunum);
 			  if (hdunum != 1) {
@@ -840,7 +855,11 @@ int fp_test (char *infits, char *outfits, char *outfits2, fpstate fpvar)
 		fits_set_compression_type (outfptr, GZIP_1, &stat);
 		fits_set_tile_dim (outfptr, 6, fpvar.ntile, &stat);
 		fp_test_hdu(infptr, outfptr, outfptr2, fpvar, &stat);
-
+/*
+		fits_set_compression_type (outfptr, PLIO_1, &stat);
+		fits_set_tile_dim (outfptr, 6, fpvar.ntile, &stat);
+		fp_test_hdu(infptr, outfptr, outfptr2, fpvar, &stat);
+*/
                 if (bitpix == SHORT_IMG || bitpix == LONG_IMG) {
 		  fits_set_compression_type (outfptr, NOCOMPRESS, &stat);
 		  fits_set_tile_dim (outfptr, 6, fpvar.ntile, &stat);
@@ -851,9 +870,10 @@ int fp_test (char *infits, char *outfits, char *outfits2, fpstate fpvar)
 		    fprintf(outreport,"\n");
 
 		/* delete the temporary file */
-		if (rescale_flag)   
+		if (rescale_flag)  { 
 		    fits_delete_file (infptr, &stat);
-
+		    tempfilename3[0] = '\0';   /* clear the temp filename */ 
+                }
 	    } else {
 		fits_copy_hdu (inputfptr, outfptr, 0, &stat);
 		fits_copy_hdu (inputfptr, outfptr2, 0, &stat);
@@ -919,7 +939,8 @@ int fp_pack_hdu (fitsfile *infptr, fitsfile *outfptr, fpstate fpvar,
 			  /* all the criteria are met, so create a temporary file that */
 			  /* contains a rescaled version of the image */
 			  
-			  fits_create_file(&tempfile, "!fptmpqqqq.qqqr", &stat);
+			  strcpy (tempfilename3, "fptmp.XXXXXX"); mktemp (tempfilename3);
+			  fits_create_file(&tempfile, tempfilename3, &stat);
 
 			  fits_get_hdu_num(infptr, &hdunum);
 			  if (hdunum != 1) {
@@ -952,6 +973,7 @@ int fp_pack_hdu (fitsfile *infptr, fitsfile *outfptr, fpstate fpvar,
 		if (rescale_flag) {
 		    fits_img_compress (tempfile, outfptr, &stat);
 		    fits_delete_file  (tempfile, &stat);
+		    tempfilename3[0] = '\0';   /* clear the temp filename */
 		} else {
 		    fits_img_compress (infptr, outfptr, &stat);
 		}
@@ -1656,9 +1678,16 @@ int fp_i4rescale(fitsfile *infptr, int naxis, long *naxes, double rescale,
  */
 void abort_fpack(int sig)
 {
+     /* clean up by deleting temporary files */
+     
       if (tempfilename[0]) {
          remove(tempfilename);
       }
-      
+      if (tempfilename2[0]) {
+         remove(tempfilename2);
+      }
+      if (tempfilename3[0]) {
+         remove(tempfilename3);
+      }
       exit(-1); 
 }

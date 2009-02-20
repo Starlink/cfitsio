@@ -10,7 +10,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#define	FPACK_VERSION	"1.1.0 (August 2008)"
+#define	FPACK_VERSION	"1.1.2 (September 2008)"
 #define	FP_INIT_MAGIC	42
 #define	FPACK		0
 #define	FUNPACK		1
@@ -23,7 +23,6 @@
 #define	SZ_STR		513
 #define	SZ_CARD		81
 
-char tempfilename[SZ_STR];
 
 typedef struct
 {
