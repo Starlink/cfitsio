@@ -185,7 +185,6 @@ int main(int argc, char *argv[])
 
           /* try to allocate memory for the entire image */
           /* use double type to force memory alignment */
-          fprintf( stderr, "npix = %d, bytepix = %d\n", npix, bytepix );
           array = (double *) calloc(npix, bytepix);
 
           /* if allocation failed, divide size by 2 and try again */
