@@ -1,0 +1,18 @@
+# Build files
+*.o
+*.a
+*.so
+*.dylib
+
+Makefile
+cfitsio.pc
+config.log
+config.status
+fitscopy
+imcopy
+listhead
+
+# Mac
+._*
+*.dSYM
+
