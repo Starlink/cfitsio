@@ -8,6 +8,7 @@ Makefile
 cfitsio.pc
 config.log
 config.status
+configure.lineno
 fitscopy
 imcopy
 listhead
