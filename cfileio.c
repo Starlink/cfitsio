@@ -2554,7 +2554,7 @@ int fits_copy_image_section(
     long naxes[] = {1,1,1,1,1,1,1,1,1}, smin, smax, sinc;
     long fpixels[] = {1,1,1,1,1,1,1,1,1};
     long lpixels[] = {1,1,1,1,1,1,1,1,1};
-    long incs[] = {1,1,1,1,1,1,1,1,1};;
+    long incs[] = {1,1,1,1,1,1,1,1,1};
     char *cptr, keyname[FLEN_KEYWORD], card[FLEN_CARD];
     int ii, tstatus, anynull;
     long minrow, maxrow, minslice, maxslice, mincube, maxcube;

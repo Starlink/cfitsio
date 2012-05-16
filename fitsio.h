@@ -34,7 +34,7 @@ SERVICES PROVIDED HEREUNDER."
 #ifndef _FITSIO_H
 #define _FITSIO_H
 
-#define CFITSIO_VERSION 3.13
+#define CFITSIO_VERSION 3.14
 
 #include <stdio.h>
 
@@ -368,7 +368,8 @@ typedef struct      /* structure used to store basic FITS file information */
     double zscale;          /* scaling value, if same for all tiles */
     double zzero;           /* zero pt, if same for all tiles */
     double cn_bscale;       /* value of the BSCALE keyword in header */
-    double cn_bzero;        /* value of the BZERO keyword in header */
+    double cn_bzero;        /* value of the BZERO keyword (may be reset) */
+    double cn_actual_bzero; /* actual value of the BZERO keyword  */
     int zblank;             /* value for null pixels, if not a column */
 
     int rice_blocksize;     /* first compression parameter: pixels/block */
