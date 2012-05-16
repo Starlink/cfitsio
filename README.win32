@@ -13,7 +13,9 @@ This step will create the cfitsio.def, cfitsio.dll, and cfitsio.lib files.
 
   A. With Microsoft Visual C++:
 
-      1. Execute the vcvars32.bat file that is distributed with Visual C++
+      1. Open a DOS command window and execute the vcvars32.bat file that 
+         is distributed with older versions of Visual C++, or simply open 
+         the Visual C++ command window (e.g., when using Visual Studio 2010).
 
       2. Unpack the CFITSIO source files (cfitxxxx.zip) into temporary directory
 
