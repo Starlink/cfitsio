@@ -310,7 +310,7 @@ ac_includes_default="\
 # include <unistd.h>
 #endif"
 
-ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS INSTALL_ROOT uname_found CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT FC RANLIB ac_ct_RANLIB CPP EGREP GCCVERSION ARCH LIBPRE SHLIB_LD SHLIB_SUFFIX F77_WRAPPERS OPTIONAL_OBJECTS my_shmem LIBOBJS LTLIBOBJS'
+ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS INSTALL_ROOT uname_found CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT FC RANLIB ac_ct_RANLIB CPP EGREP SSE_FLAGS GCCVERSION ARCH LIBPRE SHLIB_LD SHLIB_SUFFIX F77_WRAPPERS OPTIONAL_OBJECTS my_shmem LIBOBJS LTLIBOBJS'
 ac_subst_files=''
 
 # Initialize some variables set by options.
@@ -842,6 +842,10 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --enable-reentrant      Enable reentrant multithreading
+  --enable-sse2           Enable use of instructions in the SSE2 extended
+                          instruction set
+  --enable-ssse3          Enable use of instructions in the SSSE3 extended
+                          instruction set
   --enable-hera           Build for HERA (ASD use only)
 
 Optional Packages:
@@ -1308,6 +1312,21 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 if test "${enable_reentrant+set}" = set; then
   enableval="$enable_reentrant"
    if test $enableval = yes; then BUILD_REENTRANT=yes; fi
+
+fi;
+
+SSE_FLAGS=""
+# Check whether --enable-sse2 or --disable-sse2 was given.
+if test "${enable_sse2+set}" = set; then
+  enableval="$enable_sse2"
+   if test $enableval = yes; then SSE_FLAGS="-msse2"; fi
+
+fi;
+
+# Check whether --enable-ssse3 or --disable-ssse3 was given.
+if test "${enable_ssse3+set}" = set; then
+  enableval="$enable_ssse3"
+   if test $enableval = yes; then SSE_FLAGS="$SSE_FLAGS -mssse3"; fi
 
 fi;
 
@@ -3267,6 +3286,75 @@ if test $ANSI_HEADER = no -o $PROTO = no; then
      exit 0;
 fi
 
+if test "x$SSE_FLAGS" != x; then
+    SAVE_CFLAGS="$CFLAGS"
+    CFLAGS="$CFLAGS $SSE_FLAGS"
+    echo "$as_me:$LINENO: checking whether $CC accepts $SSE_FLAGS" >&5
+echo $ECHO_N "checking whether $CC accepts $SSE_FLAGS... $ECHO_C" >&6
+    ac_ext=c
+ac_cpp='$CPP $CPPFLAGS'
+ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
+ac_compiler_gnu=$ac_cv_c_compiler_gnu
+
+    cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  c_has_option=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+c_has_option=no
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+    echo "$as_me:$LINENO: result: $c_has_option" >&5
+echo "${ECHO_T}$c_has_option" >&6
+    ac_ext=c
+ac_cpp='$CPP $CPPFLAGS'
+ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
+ac_compiler_gnu=$ac_cv_c_compiler_gnu
+
+    if test "$c_has_option" = no; then SSE_FLAGS=""; fi
+    CFLAGS="$SAVE_CFLAGS"
+fi
+
+
 CFLAGS="$CFLAGS"
 LIBPRE=""
 
@@ -3281,8 +3369,8 @@ case $system in
 
                 # Test to see whether the C compiler accepts the "-arch"
                 # flags for building "universal" binaries (Apple XCode only):
-                C_UNIV_SWITCH="-arch i386 -arch x86_64"
                 SAVE_CFLAGS="$CFLAGS"
+                C_UNIV_SWITCH="-arch i386 -arch x86_64"
                 CFLAGS="$CFLAGS $C_UNIV_SWITCH"
                 echo "$as_me:$LINENO: checking whether $CC accepts $C_UNIV_SWITCH" >&5
 echo $ECHO_N "checking whether $CC accepts $C_UNIV_SWITCH... $ECHO_C" >&6
@@ -3346,9 +3434,7 @@ ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $
 ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
                 # Value of C_UNIV_SWITCH will be needed later for SHLIB_LD:
-                if test "$c_has_option" = no; then
-                   C_UNIV_SWITCH=""
-                fi
+                if test "$c_has_option" = no; then C_UNIV_SWITCH=""; fi
                 CFLAGS="$SAVE_CFLAGS $C_UNIV_SWITCH"
                 ;;
         esac
@@ -5011,6 +5097,7 @@ s,@RANLIB@,$RANLIB,;t t
 s,@ac_ct_RANLIB@,$ac_ct_RANLIB,;t t
 s,@CPP@,$CPP,;t t
 s,@EGREP@,$EGREP,;t t
+s,@SSE_FLAGS@,$SSE_FLAGS,;t t
 s,@GCCVERSION@,$GCCVERSION,;t t
 s,@ARCH@,$ARCH,;t t
 s,@LIBPRE@,$LIBPRE,;t t
@@ -5935,6 +6022,7 @@ s,@RANLIB@,$RANLIB,;t t
 s,@ac_ct_RANLIB@,$ac_ct_RANLIB,;t t
 s,@CPP@,$CPP,;t t
 s,@EGREP@,$EGREP,;t t
+s,@SSE_FLAGS@,$SSE_FLAGS,;t t
 s,@GCCVERSION@,$GCCVERSION,;t t
 s,@ARCH@,$ARCH,;t t
 s,@LIBPRE@,$LIBPRE,;t t
