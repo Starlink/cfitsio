@@ -103,7 +103,10 @@ int stat;
 
 	/* decode the input array */
 
+        FFLOCK;  /* decode uses the nextchar global variable */
 	stat = decode(input, a, nx, ny, scale);
+        FFUNLOCK;
+
         *status = stat;
 	if (stat) return(*status);
 	
@@ -143,7 +146,10 @@ int fits_hdecompress64(unsigned char *input, int smooth, LONGLONG *a, int *ny, i
 
 	/* decode the input array */
 
+        FFLOCK;  /* decode uses the nextchar global variable */
 	stat = decode64(input, a, nx, ny, scale);
+        FFUNLOCK;
+
         *status = stat;
 	if (stat) return(*status);
 	
@@ -2275,12 +2281,11 @@ int plane_val;
 static void
 read_bdirect(unsigned char *infile, int a[], int n, int nqx, int nqy, unsigned char scratch[], int bit)
 {
-int i;
-
 	/*
 	 * read bit image packed 4 pixels/nybble
 	 */
 /*
+int i;
 	for (i = 0; i < ((nqx+1)/2) * ((nqy+1)/2); i++) {
 		scratch[i] = input_nybble(infile);
 	}
@@ -2296,12 +2301,11 @@ int i;
 static void
 read_bdirect64(unsigned char *infile, LONGLONG a[], int n, int nqx, int nqy, unsigned char scratch[], int bit)
 {
-int i;
-
 	/*
 	 * read bit image packed 4 pixels/nybble
 	 */
 /*
+int i;
 	for (i = 0; i < ((nqx+1)/2) * ((nqy+1)/2); i++) {
 		scratch[i] = input_nybble(infile);
 	}

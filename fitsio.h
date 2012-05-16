@@ -34,7 +34,7 @@ SERVICES PROVIDED HEREUNDER."
 #ifndef _FITSIO_H
 #define _FITSIO_H
 
-#define CFITSIO_VERSION 3.14
+#define CFITSIO_VERSION 3.181
 
 #include <stdio.h>
 
@@ -168,6 +168,11 @@ SERVICES PROVIDED HEREUNDER."
 #include "longnam.h"
 #endif
  
+#define NIOBUF  40  /* number of IO buffers to create (default = 40) */
+          /* !! Significantly increasing NIOBUF may degrade performance !! */
+
+#define IOBUFLEN 2880    /* size in bytes of each IO buffer (DONT CHANGE!) */
+
 /* global variables */
  
 #define FLEN_FILENAME 1025 /* max length of a filename  */
@@ -252,6 +257,7 @@ SERVICES PROVIDED HEREUNDER."
 #define GZIP_1      21
 #define PLIO_1      31
 #define HCOMPRESS_1 41
+#define BZIP2_1     51  /* not publicly supported; only for test purposes */
 #define NOCOMPRESS  0
 
 #ifndef TRUE
@@ -384,6 +390,11 @@ typedef struct      /* structure used to store basic FITS file information */
     void *tiledata;         /* uncompressed tile of data, for row tilerow */
     char *tilenullarray;    /* optional array of null value flags */
     int tileanynull;        /* anynulls in this tile? */
+
+    char *iobuffer;         /* pointer to FITS file I/O buffers */
+    long bufrecnum[NIOBUF]; /* file record number of each of the buffers */
+    int dirty[NIOBUF];     /* has the corresponding buffer been modified? */
+    int ageindex[NIOBUF];  /* relative age of each buffer */  
 } FITSfile;
 
 typedef struct         /* structure used to store basic HDU information */
@@ -689,6 +700,7 @@ int ffrwrg( char *rowlist, LONGLONG maxrows, int maxranges, int *numranges,
 int ffrwrgll( char *rowlist, LONGLONG maxrows, int maxranges, int *numranges,
       LONGLONG *minrow, LONGLONG *maxrow, int *status);
 /*----------------  FITS file I/O routines -------------*/
+int fits_init_cfitsio(void);
 int ffomem(fitsfile **fptr, const char *name, int mode, void **buffptr,
            size_t *buffsize, size_t deltasize,
            void *(*mem_realloc)(void *p, size_t newsize),

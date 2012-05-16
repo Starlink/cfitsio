@@ -1,5 +1,58 @@
                    Log of Changes Made to CFITSIO
 
+Version 3.181 (BETA) - 12 May 2009
+
+   - modified region.c and region.h to add support for additional
+     types of region shapes that are supported by ds9: panda, epanda,
+     and bpanda.
+
+   - fixed compiler error when using the new _REENTRANT flag, having to 
+     do with the an attempted static definition of Fitsio_Lock in 
+     several source files, after declaring it to be non-static in fitsio2.h.
+    
+Version 3.18 (BETA) - 10 April 2009
+
+   - Made extensive changes to make CFITSIO thread safe.  Previously,
+     all opened FITS files shared a common pool of memory to store
+     the most recently read or written FITS records in the files.
+     In a multi-threaded environment different threads could 
+     simultaneously read or write to this common area causing
+     unpredictable results. This was changed so that every opened
+     FITS file has its own private memory area for buffering the
+     file. Most of the changes were in buffers.c, fitsio.h, and
+     fitsio2.h. Additional changes were made to cfileio.c, mainly
+     to put locks around small sections of code when setting up the
+     low-level drivers to read or write the FITS file.  Also, locks
+     were needed around the GZIP compression and uncompression code
+     in compress.c.,  the error message stack access routine in
+     fitscore.c, the encode and decode routines in fits_hcompress.c
+     and  fits_hdecompress.c, in ricecomp.c,  and  the table row
+     selection and table calculator functions. Also, removed the
+     'static' declaration of the local variables in pliocomp.c
+     which did not appeared to be required and prevented the
+     routines from being thread safe.
+
+     As a consequence of having a separate memory buffer for every
+     FITS file (by default, about 115 kB per file), CFITSIO may now
+     allocate more memory than previously when an application
+     program opens multiple FITS files at once.  The read and write
+     speed may also be slightly faster, since the buffers are not
+     shared between files.
+
+   - Added new families of Fortran wrapper routines to read and
+     write values to large tables that have more than 2**31 rows. 
+     The arguments that define the first row and first element to
+     read or write must be I*8 integers, not ordinary I*4
+     integers.  The names of these new routines have 'LL' appended
+     to them, so for example, ftgcvb becomes ftgcvbll.
+
+   Fixes
+   
+   - Corrected an obscure bug in imcompress.c that would have incorrectly 
+     written the null values only in the rare case of writing a signed 
+     byte array that is then tile compressed using the Hcompress or PLIO
+     algorithm.
+
 Version 3.14 - 18 March 2009
 
   Enhancements

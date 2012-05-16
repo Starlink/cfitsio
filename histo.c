@@ -1865,7 +1865,7 @@ int fits_make_hist(fitsfile *fptr, /* IO - pointer to table with X and Y cols; *
 
     for (ii = 0; ii < naxis; ii++)
     {
-      taxes[ii] = naxes[ii];
+      taxes[ii] = (float) naxes[ii];
       tmin[ii] = amin[ii];
       tmax[ii] = amax[ii];
       if ( (amin[ii] > amax[ii] && binsize[ii] > 0. ) ||
@@ -1874,9 +1874,9 @@ int fits_make_hist(fitsfile *fptr, /* IO - pointer to table with X and Y cols; *
       else
           tbin[ii] =   binsize[ii];  /* binsize has the correct sign */
           
-      imin = tmin[ii];
-      imax = tmax[ii];
-      ibin = tbin[ii];
+      imin = (long) tmin[ii];
+      imax = (long) tmax[ii];
+      ibin = (long) tbin[ii];
     
       /* get the datatype of the column */
       fits_get_coltype(fptr, colnum[ii], &datatype, NULL, NULL, status);
@@ -1889,17 +1889,17 @@ int fits_make_hist(fitsfile *fptr, /* IO - pointer to table with X and Y cols; *
         /* Shift the lower and upper histogramming limits by 0.5, so that */
         /* the values fall in the center of the bin, not on the edge. */
 
-        maxbin[ii] = (taxes[ii] + 1.);  /* add 1. instead of .5 to avoid roundoff */
+        maxbin[ii] = (taxes[ii] + 1.F);  /* add 1. instead of .5 to avoid roundoff */
 
         if (tmin[ii] < tmax[ii])
         {
-          tmin[ii] = tmin[ii] - 0.5;
-          tmax[ii] = tmax[ii] + 0.5;
+          tmin[ii] = tmin[ii] - 0.5F;
+          tmax[ii] = tmax[ii] + 0.5F;
         }
         else
         {
-          tmin[ii] = tmin[ii] + 0.5;
-          tmax[ii] = tmax[ii] - 0.5;
+          tmin[ii] = tmin[ii] + 0.5F;
+          tmax[ii] = tmax[ii] - 0.5F;
         }
       } else {  /* not an integer column with integer limits */
           maxbin[ii] = (tmax[ii] - tmin[ii]) / tbin[ii]; 
@@ -1914,7 +1914,7 @@ int fits_make_hist(fitsfile *fptr, /* IO - pointer to table with X and Y cols; *
     histData.amin1 = tmin[0];
     histData.maxbin1 = maxbin[0];
     histData.binsize1 = tbin[0];
-    histData.haxis1 = taxes[0];
+    histData.haxis1 = (long) taxes[0];
 
     if (histData.haxis > 1)
     {
@@ -1922,7 +1922,7 @@ int fits_make_hist(fitsfile *fptr, /* IO - pointer to table with X and Y cols; *
       histData.amin2 = tmin[1];
       histData.maxbin2 = maxbin[1];
       histData.binsize2 = tbin[1];
-      histData.haxis2 = taxes[1];
+      histData.haxis2 = (long) taxes[1];
 
       if (histData.haxis > 2)
       {
@@ -1930,7 +1930,7 @@ int fits_make_hist(fitsfile *fptr, /* IO - pointer to table with X and Y cols; *
         histData.amin3 = tmin[2];
         histData.maxbin3 = maxbin[2];
         histData.binsize3 = tbin[2];
-        histData.haxis3 = taxes[2];
+        histData.haxis3 = (long) taxes[2];
 
         if (histData.haxis > 3)
         {
@@ -1938,7 +1938,7 @@ int fits_make_hist(fitsfile *fptr, /* IO - pointer to table with X and Y cols; *
           histData.amin4 = tmin[3];
           histData.maxbin4 = maxbin[3];
           histData.binsize4 = tbin[3];
-          histData.haxis4 = taxes[3];
+          histData.haxis4 = (long) taxes[3];
         }
       }
     }
@@ -1949,7 +1949,7 @@ int fits_make_hist(fitsfile *fptr, /* IO - pointer to table with X and Y cols; *
     fits_iter_set_iotype(imagepars, OutputCol);    /* image is output  */
 
     /* call the iterator function to write out the histogram image */
-   fits_iterate_data(n_cols, imagepars, offset, n_per_loop,
+    fits_iterate_data(n_cols, imagepars, offset, n_per_loop,
                           ffwritehisto, (void*)&histData, status);
        
     return(*status);
@@ -2044,8 +2044,14 @@ int ffwritehisto(long totaln, long pixoffset, long firstn, long nvalues,
     }
 
     /* call iterator function to calc the histogram pixel values */
+
+    /* must lock this call in multithreaded environoments because */
+    /* the ffcalchist work routine uses static vaiables that would */
+    /* get clobbered if multiple threads were running at the same time */
+    FFLOCK;
     fits_iterate_data(ncols, colpars, offset, rows_per_loop,
                           ffcalchist, (void*)histData, &status);
+    FFUNLOCK;
 
     return(status);
 }

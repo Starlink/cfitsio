@@ -1240,7 +1240,7 @@ int fp_test_hdu (fitsfile *infptr, fitsfile *outfptr, fitsfile *outfptr2,
 		strcpy(ctype, "NONE");
 	else {
 	      fp_msg ("Error: unsupported image compression type ");
-	      *status = DATA_COMPRESSION_ERR;
+	      *status = DATA_COMPRESSION_ERR[
 	      return(0);
 	}
 
