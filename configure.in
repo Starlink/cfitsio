@@ -182,6 +182,8 @@ case $system in
 	if test "x$CFORTRANFLAGS" = x ; then
 		CFORTRANFLAGS="-Dsolaris"
 	fi
+        # We need libm on Solaris:
+        AC_CHECK_LIB(m, frexp)
         # For large file support:
         AC_DEFINE(_LARGEFILE_SOURCE)
         AC_DEFINE(_FILE_OFFSET_BITS,64)
@@ -225,7 +227,7 @@ CFLAGS="$CFLAGS $CFORTRANFLAGS"
 
 case $GCC in
 	yes)
-		GCCVERSION="`gcc -dumpversion 2>&1`"
+		GCCVERSION="`$CC -dumpversion 2>&1`"
 		echo "cfitsio: == Using gcc version $GCCVERSION"
 		AC_SUBST(GCCVERSION)
                 changequote(,)

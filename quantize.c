@@ -91,14 +91,13 @@ nearly the original floating point values:  fdata ~= idata * bscale + bzero.
 If the function value is zero, the data were not copied to idata.
 */
 
-	int status, nshift, anynulls = 0, iseed;
+	int status, anynulls = 0, iseed;
 	long i, nx, ngood = 0;
 	double stdev;	/* mean and RMS of differences */
 	float minval = 0., maxval = 0.;  /* min & max of fdata */
 	double delta;		/* bscale, 1 in idata = delta in fdata */
 	double zeropt;	        /* bzero */
 	double temp;
-	float fvalue;
         int nextrand = 0;
 	extern float *fits_rand_value; /* this is defined in imcompress.c */
 	LONGLONG iqfactor;
@@ -164,7 +163,7 @@ If the function value is zero, the data were not copied to idata.
 		/* fudge the zero point so it is an integer multiple of delta */
 		/* This helps to ensure the same scaling will be performed if the */
 		/* file undergoes multiple fpack/funpack cycles */
-		iqfactor = zeropt/delta  + 0.5;
+		iqfactor = (LONGLONG) (zeropt/delta  + 0.5);
 		zeropt = iqfactor * delta;               
             }
             else
@@ -176,7 +175,7 @@ If the function value is zero, the data were not copied to idata.
             if (row > 0) {  /* dither the values when quantizing */
               for (i = 0;  i < nx;  i++) {
 	    
-		idata[i] =  NINT(((fdata[i] - zeropt) / delta) + fits_rand_value[nextrand] - 0.5);
+		idata[i] =  NINT((((double) fdata[i] - zeropt) / delta) + fits_rand_value[nextrand] - 0.5);
 
                 nextrand++;
 		if (nextrand == N_RANDOM) {
@@ -200,7 +199,7 @@ If the function value is zero, the data were not copied to idata.
             if (row > 0) {  /* dither the values */
 	      for (i = 0;  i < nx;  i++) {
                 if (fdata[i] != in_null_value) {
-		    idata[i] =  NINT(((fdata[i] - zeropt) / delta) + fits_rand_value[nextrand] - 0.5);
+		    idata[i] =  NINT((((double) fdata[i] - zeropt) / delta) + fits_rand_value[nextrand] - 0.5);
                 } else {
                     idata[i] = NULL_VALUE;
                 }
@@ -258,17 +257,15 @@ nearly the original floating point values:  fdata ~= idata * bscale + bzero.
 If the function value is zero, the data were not copied to idata.
 */
 
-	int status, nshift, anynulls = 0, iseed;
+	int status, anynulls = 0, iseed;
 	long i, nx, ngood = 0;
 	double stdev;	/* mean and RMS of differences */
 	double minval = 0., maxval = 0.;  /* min & max of fdata */
 	double delta;		/* bscale, 1 in idata = delta in fdata */
 	double zeropt;	        /* bzero */
 	double temp;
-	double fvalue;
         int nextrand = 0;
 	extern float *fits_rand_value;
-	LONGLONG iqfactor;
 
 	nx = nxpix * nypix;
 	if (nx <= 1) {
@@ -350,7 +347,7 @@ If the function value is zero, the data were not copied to idata.
             if (row > 0) {  /* dither the values when quantizing */
        	      for (i = 0;  i < nx;  i++) {
 
-		idata[i] =  NINT(((fdata[i] - zeropt) / delta) + fits_rand_value[nextrand] - 0.5);
+		idata[i] =  NINT((((double) fdata[i] - zeropt) / delta) + fits_rand_value[nextrand] - 0.5);
 
                 nextrand++;
 		if (nextrand == N_RANDOM) {
@@ -373,7 +370,7 @@ If the function value is zero, the data were not copied to idata.
             if (row > 0) {  /* dither the values */
 	      for (i = 0;  i < nx;  i++) {
                 if (fdata[i] != in_null_value) {
-		    idata[i] =  NINT(((fdata[i] - zeropt) / delta) + fits_rand_value[nextrand] - 0.5);
+		    idata[i] =  NINT((((double) fdata[i] - zeropt) / delta) + fits_rand_value[nextrand] - 0.5);
                 } else {
                     idata[i] = NULL_VALUE;
                 }
