@@ -1545,7 +1545,7 @@ int fits_calc_binning(
          if (ffgky(fptr, TDOUBLE, keyname, binsizein + ii, NULL, &tstatus) > 0)
          {
 	    /* make at least 10 bins */
-            binsize[ii] = (amax[ii] - amin[ii]) / 10. ;
+            binsize[ii] = (amax[ii] - amin[ii]) / 10.F ;
             if (binsize[ii] > 1.)
                 binsize[ii] = 1.;  /* use default bin size */
          }

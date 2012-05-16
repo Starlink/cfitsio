@@ -10,6 +10,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <stdlib.h>
+#include <math.h>
 
 /* these filename buffer are used to delete temporary files */
 /* in case the program is aborted */
@@ -73,6 +74,7 @@ int fp_init (fpstate *fpptr)
 
 	fpptr->comptype = RICE_1;
 	fpptr->quantize_level = DEF_QLEVEL;
+        fpptr->no_dither = 0;
 	fpptr->scale = DEF_HCOMP_SCALE;
 	fpptr->smooth = DEF_HCOMP_SMOOTH;
 	fpptr->rescale_noise = DEF_RESCALE_NOISE;
@@ -92,6 +94,7 @@ int fp_init (fpstate *fpptr)
 	fpptr->verbose = 0;
 
 	fpptr->prefix[0] = (char) NULL;
+	fpptr->extname[0] = (char) NULL;
 	fpptr->delete_suffix = 0;
 	fpptr->outfile[0] = (char) NULL;
 
@@ -180,15 +183,12 @@ int fp_info_hdu (fitsfile *infptr)
 
 	for (hdupos=1; ! stat; hdupos++) {
 	    fits_get_hdu_type (infptr, &hdutype, &stat);
-/*	    fits_read_keyword (infptr, FILE_KEY, val, com, &stat);
- */
+
 	    if (stat) { fits_report_error (stderr, stat); exit (stat); }
 
 	    if (hdutype == IMAGE_HDU) {
 		sprintf (msg, "  %d IMAGE", hdupos); fp_msg (msg);
 
-/*		sprintf (msg, "  %d IMAGE %s", hdupos, val); fp_msg (msg);
- */
 		fits_get_img_param (infptr, 9, &bitpix, &naxis, naxes, &stat);
 
 		if (naxis == 0) {
@@ -378,6 +378,13 @@ int fp_preflight (int argc, char *argv[], int unpack, fpstate *fpptr)
                         outfits[namelen - 3] = '\0';
 	      }
 	      
+	      /* remove .imh suffix (IRAF format image), and replace with .fits */
+              namelen = strlen(outfits);
+	      if ( !strcmp(".imh", outfits + namelen - 4) ) {
+                        outfits[namelen - 4] = '\0';
+                        strcat(outfits, ".fits");
+	      }
+
 	      /* If not clobbering the input file, add .fz suffix to output name */
 	      if (! fpptr->clobber)
 		        strcat(outfits, ".fz");
@@ -403,7 +410,7 @@ int fp_loop (int argc, char *argv[], int unpack, fpstate fpvar)
 {
 	char	infits[SZ_STR], outfits[SZ_STR];
 	char	temp[SZ_STR], answer[30], *cptr;
-	int	iarg, islossless, namelen;
+	int	iarg, islossless, namelen, iraf_infile = 0, status = 0;
         
 	if (fpvar.initialized != FP_INIT_MAGIC) {
 	    fp_msg ("Error: internal initialization error\n"); exit (-1);
@@ -501,6 +508,15 @@ int fp_loop (int argc, char *argv[], int unpack, fpstate fpvar)
                         outfits[namelen - 3] = '\0';
 	          }
 	      
+	          /* remove .imh suffix (IRAF format image), and replace with .fits */
+                  namelen = strlen(outfits);
+	          if ( !strcmp(".imh", outfits + namelen - 4) ) {
+                        outfits[namelen - 4] = '\0';
+                        strcat(outfits, ".fits");
+                        iraf_infile = 1;  /* this is an IRAF format input file */
+			           /* change the output name to "NAME.fits.fz" */
+	          }
+
 	          /* If not clobbering the input file, add .fz suffix to output name */
 	          if (! fpvar.clobber)
 		        strcat(outfits, ".fz");
@@ -580,6 +596,14 @@ int fp_loop (int argc, char *argv[], int unpack, fpstate fpvar)
 		}
  
 	        /* rename clobbers input, may be unix/shell version dependent */
+
+		if (iraf_infile) {  /* special case of deleting an IRAF format header and pixel file */
+		   if (fits_delete_iraf_file(infits, &status)) {
+		        fp_msg("\nError deleting IRAF .imh and .pix files.\n");
+			fp_msg(infits); fp_msg ("\n"); exit (-1);
+		    }
+		}
+				
 		if (rename (outfits, temp) != 0) {
 		        fp_msg ("\nError renaming tmp file to ");
 		        fp_msg (temp); fp_msg ("\n"); exit (-1);
@@ -588,25 +612,38 @@ int fp_loop (int argc, char *argv[], int unpack, fpstate fpvar)
                 strcpy(outfits, temp);
 
 	    } else if (fpvar.clobber || fpvar.delete_input) {      /* delete the input file */
-	         if (!islossless && !fpvar.do_not_prompt) {
+	         if (!islossless && !fpvar.do_not_prompt) {  /* user did not turn off delete prompt */
 		    fp_msg ("\nFile ");
 		    fp_msg (infits); 
 		    fp_msg ("\nwas compressed with a LOSSY method.  \n");
 		    fp_msg ("Delete the original file? (Y/N) ");
 		    fgets(answer, 29, stdin);
-		    if (answer[0] != 'Y' && answer[0] != 'y') {
+		    if (answer[0] != 'Y' && answer[0] != 'y') {  /* user abort */
 		        fp_msg ("\noriginal file NOT deleted!\n");
-		    } else if (remove(infits) != 0) {
-		        fp_msg ("\nError deleting input file ");
-		        fp_msg (infits); fp_msg ("\n"); exit (-1);
+		    } else {
+			if (iraf_infile) {  /* special case of deleting an IRAF format header and pixel file */
+		   	    if (fits_delete_iraf_file(infits, &status)) {
+		        	fp_msg("\nError deleting IRAF .imh and .pix files.\n");
+				fp_msg(infits); fp_msg ("\n"); exit (-1);
+			    }
+		        }  else if (remove(infits) != 0) {  /* normal case of deleting input FITS file */
+		            fp_msg ("\nError deleting input file ");
+		            fp_msg (infits); fp_msg ("\n"); exit (-1);
+		        }
 		    }
-		  } else {
-		     if (remove(infits) != 0) {
-		        fp_msg ("\nError deleting input file ");
-		        fp_msg (infits); fp_msg ("\n"); exit (-1);
-		     }
+		  } else {   /* user said don't prompt, so just delete the input file */
+			if (iraf_infile) {  /* special case of deleting an IRAF format header and pixel file */
+		   	    if (fits_delete_iraf_file(infits, &status)) {
+		        	fp_msg("\nError deleting IRAF .imh and .pix files.\n");
+				fp_msg(infits); fp_msg ("\n"); exit (-1);
+			    }
+		        }  else if (remove(infits) != 0) {  /* normal case of deleting input FITS file */
+		            fp_msg ("\nError deleting input file ");
+		            fp_msg (infits); fp_msg ("\n"); exit (-1);
+		        }
 		  }
 	    }
+            iraf_infile = 0; 
 
 	    if (fpvar.do_gzip_file) {       /* gzip the output file */
 		strcpy(temp, "gzip -1 ");
@@ -639,6 +676,10 @@ int fp_pack (char *infits, char *outfits, fpstate fpvar, int *islossless)
 	if (stat) { fits_report_error (stderr, stat); exit (stat); }
 
 	fits_set_compression_type (outfptr, fpvar.comptype, &stat);
+
+	if (fpvar.no_dither)
+	    fits_set_quantize_dither(outfptr, -1, &stat);
+	    
 	fits_set_quantize_level (outfptr, fpvar.quantize_level, &stat);
 	fits_set_hcomp_scale (outfptr, fpvar.scale, &stat);
 	fits_set_hcomp_smooth (outfptr, fpvar.smooth, &stat);
@@ -679,21 +720,121 @@ int fp_pack (char *infits, char *outfits, fpstate fpvar, int *islossless)
 int fp_unpack (char *infits, char *outfits, fpstate fpvar)
 {
         fitsfile *infptr, *outfptr;
-        int     stat=0;
+        int stat=0, hdutype, extnum, single = 0;
+	char *loc, *hduloc, hduname[SZ_STR];
 
         fits_open_file (&infptr, infits, READONLY, &stat);
         fits_create_file (&outfptr, outfits, &stat);
 
-        if (stat) { fits_report_error (stderr, stat); exit (stat); }
+        if (fpvar.extname[0]) {  /* unpack a list of HDUs? */
+
+            /* move to the first HDU in the list */
+	    hduloc = fpvar.extname;
+	    loc = strchr(hduloc, ','); /* look for 'comma' delimiter between names */
+	    
+	    if (loc)         
+	        *loc = '\0';  /* terminate the first name in the string */
+
+	    strcpy(hduname, hduloc);  /* copy the first name into temporary string */
+
+	    if (loc)        
+	        hduloc = loc + 1;  /* advance to the beginning of the next name, if any */
+            else {
+	        hduloc += strlen(hduname);  /* end of the list */
+	        single = 1;  /* only 1 HDU is being unpacked */
+            }
+
+            if (isdigit( (int) hduname[0]) ) {
+	       extnum = strtol(hduname, &loc, 10); /* read the string as an integer */
+
+               /* check for junk following the integer */
+               if (*loc == '\0' )  /* no junk, so move to this HDU number (+1) */
+               {	       
+                  fits_movabs_hdu(infptr, extnum + 1, &hdutype, &stat);  /* move to HDU number */
+                  if (hdutype != IMAGE_HDU)
+		     stat = NOT_IMAGE;
+
+               } else {  /* the string is not an integer, so must be the column name */
+	          hdutype = IMAGE_HDU;
+	          fits_movnam_hdu(infptr, hdutype, hduname, 0, &stat);
+ 	       }
+            }
+	    else
+	    {
+                /* move to the named image extension */
+  	        hdutype = IMAGE_HDU;
+	        fits_movnam_hdu(infptr, hdutype, hduname, 0, &stat);
+            }
+        }
+        if (stat) {
+	  fp_msg ("Unable to find and move to extension '");
+          fp_msg(hduname);
+	  fp_msg("'\n");
+	  fits_report_error (stderr, stat); 
+	  exit (stat);
+        }
 
         while (! stat) {
+	
+	    if (single)
+	        stat = -1;  /* special status flag to force output primary array */
+
             fp_unpack_hdu (infptr, outfptr, &stat);
 
 	    if (fpvar.do_checksums) {
 	        fits_write_chksum (outfptr, &stat);
 	    }
 
-            fits_movrel_hdu (infptr, 1, NULL, &stat);
+	    /* move to the next HDU */
+            if (fpvar.extname[0]) {  /* unpack a list of HDUs? */
+
+                if (!(*hduloc)) {
+		    stat = END_OF_FILE;  /* we reached the end of the list */
+		} else {
+		    /* parse the next HDU name and move to it */
+	            loc = strchr(hduloc, ',');
+	    
+	            if (loc)         /* look for 'comma' delimiter between names */
+	               *loc = '\0';  /* terminate the first name in the string */
+
+	            strcpy(hduname, hduloc);  /* copy the next name into temporary string */
+
+	            if (loc)         
+	                hduloc = loc + 1;  /* advance to the beginning of the next name, if any */
+                    else
+	               *hduloc = '\0';  /* end of the list */
+
+                    if (isdigit( (int) hduname[0]) ) {
+	               extnum = strtol(hduname, &loc, 10); /* read the string as an integer */
+
+                      /* check for junk following the integer */
+                      if (*loc == '\0' )   /* no junk, so move to this HDU number (+1) */
+		      {	       
+                        fits_movabs_hdu(infptr, extnum + 1, &hdutype, &stat);  /* move to HDU number */
+                        if (hdutype != IMAGE_HDU)
+		        stat = NOT_IMAGE;
+
+                      } else {  /* the string is not an integer, so must be the column name */
+	                hdutype = IMAGE_HDU;
+	                fits_movnam_hdu(infptr, hdutype, hduname, 0, &stat);
+ 	              }
+
+                    } else {
+                      /* move to the named image extension */
+  	              hdutype = IMAGE_HDU;
+	              fits_movnam_hdu(infptr, hdutype, hduname, 0, &stat);
+                   }
+
+                   if (stat) {
+	              fp_msg ("Unable to find and move to extension '");
+                      fp_msg(hduname);
+	              fp_msg("'\n");
+                   }
+                }
+            } else {
+                /* increment to the next HDU */
+                fits_movrel_hdu (infptr, 1, NULL, &stat);
+            }
         }
 
         if (stat == END_OF_FILE) stat = 0;
@@ -733,6 +874,9 @@ int fp_test (char *infits, char *outfits, char *outfits2, fpstate fpvar)
 	fits_create_file (&outfptr2, outfits2, &stat);
 
 	if (stat) { fits_report_error (stderr, stat); exit (stat); }
+
+	if (fpvar.no_dither)
+	    fits_set_quantize_dither(outfptr, -1, &stat);
 
 	fits_set_quantize_level (outfptr, fpvar.quantize_level, &stat);
 	fits_set_hcomp_scale (outfptr, fpvar.scale, &stat);
@@ -1029,16 +1173,13 @@ int fp_pack_hdu (fitsfile *infptr, fitsfile *outfptr, fpstate fpvar,
 /*--------------------------------------------------------------------------*/
 int fp_unpack_hdu (fitsfile *infptr, fitsfile *outfptr, int *status)
 {
-        int stat=0;
+        if (*status > 0) return(0);
 
-        if (*status) return(0);
-
-        if (fits_is_compressed_image (infptr,  &stat))
-            fits_img_decompress (infptr, outfptr, &stat);
+        if (fits_is_compressed_image (infptr,  status))
+            fits_img_decompress (infptr, outfptr, status);
         else
-            fits_copy_hdu (infptr, outfptr, 0, &stat);
+            fits_copy_hdu (infptr, outfptr, 0, status);
 
-        *status = stat;
 	return(0);
 }
 /*--------------------------------------------------------------------------*/
@@ -1074,6 +1215,10 @@ int fits_read_image_speed (fitsfile *infptr, float *whole_elapse,
         if (bitpix == BYTE_IMG) {
 		carray = calloc(naxes[1]*naxes[0], sizeof(char));
 
+                /* remove any cached uncompressed tile 
+		  (dangerous to directly modify the structure!) */
+                (infptr->Fptr)->tilerow = 0;
+
 		marktime(status);
 		fits_read_subset(infptr, TBYTE, fpixel, lpixel, inc, &cnull, 
 		      carray, &anynull, status);
@@ -1083,6 +1228,11 @@ int fits_read_image_speed (fitsfile *infptr, float *whole_elapse,
 
 		/* now read the image again, row by row */
 		if (row_elapse) {
+
+                  /* remove any cached uncompressed tile 
+	  	    (dangerous to directly modify the structure!) */
+                  (infptr->Fptr)->tilerow = 0;
+
 		  marktime(status);
 		  for (ii = 0; ii < naxes[1]; ii++) {
 		   fpixel[1] = ii+1;
@@ -1254,20 +1404,27 @@ int fp_test_hdu (fitsfile *infptr, fitsfile *outfptr, fitsfile *outfptr2,
 	gettime(&elapse, &packcpu, &stat);
 
 	/* get elapsed and cpu times need to read the compressed image */
-/*
-	if (comptype == HCOMPRESS_1) {
+
+        /* if whole image is compressed as single tile, don't read row by row
+	   because it usually takes a very long time
+	*/
+        if (fpvar.ntile[1] == 0) {
 	  fits_read_image_speed (outfptr, &whole_elapse, &whole_cpu, 
 	   0, 0, &stat);
 	  row_elapse = 0; row_cpu = 0;
-	} else 
-*/
+	} else {
+
 	  fits_read_image_speed (outfptr, &whole_elapse, &whole_cpu, 
 	   &row_elapse, &row_cpu, &stat);
-	
+	}
 
         if (!stat) {
 
 		/* -------------- UNCOMPRESS the image ------------------ */
+
+                /* remove any cached uncompressed tile 
+		  (dangerous to directly modify the structure!) */
+                (outfptr->Fptr)->tilerow = 0;
 		marktime(&stat);
 
  	       fits_img_decompress (outfptr, outfptr2, &stat);
