@@ -7,13 +7,28 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <unistd.h>
-#include <sys/stat.h>
-#include <sys/types.h>
+/* not needed any more */
+/* #include <unistd.h> */
+/* #include <sys/stat.h> */
+/* #include <sys/types.h> */
 
-#define	FPACK_VERSION	"1.2.0 (Sept 2009)"
+#define	FPACK_VERSION	"1.4.0 (Jan 2010)"
 /*
 VERSION	History
+1.4.0 (Jan 2010) Reduced the default value for the q floating point image 
+      quantization parameter from 16 to 8.  This results in about 15% better
+      compression with no lost of information (especially with the new
+      subtractive dithering enhancement).  Replaced the code for generating
+      temporary filenames to make the code more portable (to Windows). 
+      Replaced calls to the unix 'access' and 'stat' functions with more
+      portable code.   When unpacking a file, write it first to a temporary
+      file, then rename it when finished, so that other tasks cannot try to
+      read the file before it is complete.
+1.3.0 (Oct 2009) added randomization to the dithering pattern so that
+      the same pattern is not used for every image; also added an option
+      for losslessly compressing floating point images with GZIP for test 
+      purposes (not recommended for general use).  Also added support for
+      reading the input FITS file from the stdin file streams.
 1.2.0 (Sept 2009) added subtractive dithering feature (in CFITSIO) when
       quantizing floating point images; When packing an IRAF .imh + .pix image,
       the file name is changed to FILE.fits.fz, and if the original file is
@@ -27,7 +42,9 @@ VERSION	History
 #define	FPACK		0
 #define	FUNPACK		1
 
-#define	DEF_QLEVEL	16.
+/* changed from 16 in Jan. 2010 */
+#define	DEF_QLEVEL	4.  
+
 #define	DEF_HCOMP_SCALE	 0.
 #define	DEF_HCOMP_SMOOTH 0
 #define	DEF_RESCALE_NOISE 0
@@ -41,6 +58,7 @@ typedef struct
 	int	comptype;
 	float	quantize_level;
 	int     no_dither;
+	int     dither_offset;
 	float	scale;
 	float	rescale_noise;
 	int	smooth;

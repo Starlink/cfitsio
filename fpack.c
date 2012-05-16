@@ -8,6 +8,7 @@
 #include <signal.h>
 #include "fitsio.h"
 #include "fpack.h"
+
 /* ================================================================== */
 int main(int argc, char *argv[])
 {
@@ -31,7 +32,7 @@ int main(int argc, char *argv[])
 /* ================================================================== */
 int fp_get_param (int argc, char *argv[], fpstate *fpptr)
 {
-	int	gottype=0, gottile=0, wholetile=0, iarg, len, ndim, ii;
+	int	gottype=0, gottile=0, wholetile=0, iarg, len, ndim, ii, doffset;
 	char	tmp[SZ_STR], tile[SZ_STR];
 
         if (fpptr->initialized != FP_INIT_MAGIC) {
@@ -44,7 +45,7 @@ int fp_get_param (int argc, char *argv[], fpstate *fpptr)
 	 */
 	for (iarg = 1; iarg < argc; iarg++) {
 	    if ((argv[iarg][0] == '-' && strlen (argv[iarg]) == 2) ||
-	        !strcmp(argv[iarg], "-q0") )  /* 1 special case */
+	        !strncmp(argv[iarg], "-q", 2) )  /* 1 special case */
 	    {
 
 		/* Rice is the default, so -r is superfluous 
@@ -98,8 +99,22 @@ int fp_get_param (int argc, char *argv[], fpstate *fpptr)
 			gottype++;
 
 		} else if (argv[iarg][1] == 'q') {
-                    if (argv[iarg][2] == '0')
-		        fpptr->no_dither = 1;  /* don't dither the quantized values */
+		    /* test for modifiers following the 'q' */
+                    if (argv[iarg][2] == 't') {
+		        fpptr->dither_offset = -1;  /* dither based on tile checksum */
+
+                    } else if (isdigit(argv[iarg][2])) { /* is a number appended to q? */
+		       doffset = atoi(argv[iarg]+2);
+
+                       if (doffset == 0) {
+		          fpptr->no_dither = 1;  /* don't dither the quantized values */
+		       } else if (doffset > 0 && doffset <= 10000) {
+		          fpptr->dither_offset = doffset;
+		       } else {
+			  fp_msg ("Error: invalid q suffix\n");
+			  fp_usage (); exit (-1);
+		       }
+		    }
 
 		    if (++iarg >= argc) {
 			fp_usage (); exit (-1);
@@ -190,6 +205,11 @@ int fp_get_param (int argc, char *argv[], fpstate *fpptr)
 	    fp_msg ("Error: `-s' requires `-h or -T'\n"); exit (-1);
 	}
 
+	if (fpptr->quantize_level == 0. && 
+	         fpptr->comptype != GZIP_1 ) {
+
+	    fp_msg ("Error: `-q 0' only allowed with GZIP\n"); exit (-1);
+	}
 
 	if (wholetile) {
 	    for (ndim=0; ndim < MAX_COMPRESS_DIM; ndim++)
@@ -244,50 +264,59 @@ return(0);
 /* ================================================================== */
 int fp_help (void)
 {
-fp_msg ("fpack, a FITS tile-compression engine.  Version ");
+fp_msg ("fpack, a FITS image compression program.  Version ");
 fp_version ();
 fp_usage ();
 fp_msg ("\n");
 
 fp_msg ("Flags must be separate and appear before filenames:\n");
-fp_msg ("   -r          Rice compression [default], or\n");
-fp_msg ("   -h          Hcompress compression, or\n");
-fp_msg ("   -g          GZIP (per-tile) compression, or\n");
+fp_msg (" -r          Rice compression [default], or\n");
+fp_msg (" -h          Hcompress compression, or\n");
+fp_msg (" -g          GZIP (per-tile) compression, or\n");
 /*
-fp_msg ("   -b          BZIP2 (per-tile) compression, or\n");
+fp_msg (" -b          BZIP2 (per-tile) compression, or\n");
 */
-fp_msg ("   -p          PLIO compression (only for positive 8 or 16-bit integer images)\n");
-fp_msg ("   -d          tile the image without compression (debugging mode)\n");
+fp_msg (" -p          PLIO compression (only for positive 8 or 16-bit integer images).\n");
+fp_msg (" -d          Tile the image without compression (debugging mode).\n");
 
-fp_msg ("   -w          compress the whole image,as a single large tile\n");
-fp_msg ("   -t <axes>   comma separated list of tile dimensions [default=row by row]\n");
-fp_msg ("   -q <level>  quantization level for floating point images [default=16].\n");
-fp_msg ("               Larger values preserve more precision and give less compression.\n");
-fp_msg ("               (+value relative to RMS noise; -value is absolute)\n");
-fp_msg ("               Use -q0 instead of -q to suppress random dithering during quantization.\n");
+fp_msg (" -w          Compress the whole image as a single large tile.\n");
+fp_msg (" -t <axes>   Comma separated list of tile dimensions [default is row by row].\n");
 
-fp_msg ("   -s <scale>  scale factor for lossy Hcompress [default = 0 = lossless]\n");
-fp_msg ("               (+values relative to RMS noise; -value is absolute)\n");
-fp_msg ("   -n <noise>  rescale scaled-integer images to reduce noise\n");
+fp_msg (" -q <level>  Quantized level spacing when converting floating point images to\n");
+fp_msg ("             scaled integers. (+value relative to sigma of background noise;\n");
+fp_msg ("             -value is absolute). Default q value of 4 gives a compression ratio\n");
+fp_msg ("             of about 6 with very high fidelity (possibly more than necessary).\n");
+fp_msg ("             Using q values of  2, or 1 will give compression ratios of\n");
+fp_msg ("             about 8, or 10, respectively, with progressively less (but\n");
+fp_msg ("             still good) fidelity.  The scaled quantized values are randomly\n");
+fp_msg ("             dithered by default using a seed value determined from the system\n");
+fp_msg ("             clock at run time. Use -q0 instead of -q to suppress random dithering.\n");
+fp_msg ("             Use -qt to compute random dithering seed from first tile checksum.\n");
+fp_msg ("             Use -qN, (N in range 1 to 10000) to use a specific dithering seed.\n");
 
-fp_msg ("   -v          verbose mode; list each file as it is processed\n");
-fp_msg ("   -T          print test comparison report of compression algorithms\n");
-fp_msg ("   -R <file>   write test report results to text file\n");
+fp_msg (" -s <scale>  Scale factor for lossy Hcompress [default = 0 = lossless]\n");
+fp_msg ("             (+values relative to RMS noise; -value is absolute)\n");
+fp_msg (" -n <noise>  Rescale scaled-integer images to reduce noise and improve compression.\n");
+
+fp_msg (" -v          Verbose mode; list each file as it is processed.\n");
+fp_msg (" -T          Show compression algorithm comparison test statistics; files unchanged.\n");
+fp_msg (" -R <file>   Write the comparison test report (above) to a text file.\n");
 
 fp_msg ("\nkeywords shared with funpack:\n");
 
-fp_msg ("   -F          overwrite input file by output file with same name\n");
-fp_msg ("   -D          delete input file after writing output\n");
-fp_msg ("   -Y          suppress prompts to confirm -F or -D options\n");
+fp_msg (" -F          Overwrite input file by output file with same name.\n");
+fp_msg (" -D          Delete input file after writing output.\n");
+fp_msg (" -Y          Suppress prompts to confirm -F or -D options.\n");
 
-fp_msg ("   -S          output compressed FITS files to STDOUT\n");
-fp_msg ("   -L          list contents, files unchanged\n");
+fp_msg (" -S          Output compressed FITS files to STDOUT.\n");
+fp_msg (" -L          List contents; files unchanged.\n");
 
-fp_msg ("   -C          don't update FITS checksum keywords\n");
+fp_msg (" -C          Don't update FITS checksum keywords.\n");
 
-fp_msg ("   -H          print this message\n");
-fp_msg ("   -V          print version number\n");
+fp_msg (" -H          Show this message.\n");
+fp_msg (" -V          Show version number.\n");
 
-fp_msg (" <FITS>        FITS files to pack\n");
+fp_msg ("\n <FITS>      FITS files to pack; enter '-' (a hyphen) to read input from stdin stream.\n");
+fp_msg (" Refer to the fpack User's Guide for more extensive help.\n");
 return(0);
 }
