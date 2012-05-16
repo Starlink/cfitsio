@@ -34,8 +34,8 @@ SERVICES PROVIDED HEREUNDER."
 #ifndef _FITSIO_H
 #define _FITSIO_H
 
-#define CFITSIO_VERSION 3.27
-#define CFITSIO_MINOR 27
+#define CFITSIO_VERSION 3.28
+#define CFITSIO_MINOR 28
 #define CFITSIO_MAJOR 3
 
 #include <stdio.h>
@@ -372,10 +372,11 @@ typedef struct      /* structure used to store basic FITS file information */
     long znaxis[MAX_COMPRESS_DIM];  /* length of each axis */
     long tilesize[MAX_COMPRESS_DIM]; /* size of compression tiles */
     long maxtilelen;        /* max number of pixels in each image tile */
-    long maxelem;		/* maximum length of variable length arrays */
+    long maxelem;	    /* maximum byte length of tile compressed arrays */
 
     int cn_compressed;	    /* column number for COMPRESSED_DATA column */
     int cn_uncompressed;    /* column number for UNCOMPRESSED_DATA column */
+    int cn_gzip_data;       /* column number for GZIP2 lossless compressed data */
     int cn_zscale;	    /* column number for ZSCALE column */
     int cn_zzero;	    /* column number for ZZERO column */
     int cn_zblank;          /* column number for the ZBLANK column */
