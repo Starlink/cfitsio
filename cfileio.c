@@ -62,7 +62,7 @@ int ffomem(fitsfile **fptr,      /* O - FITS file pointer                   */
   of ffopen.
 */
 {
-    int driver, handle, hdutyp, slen, movetotype, extvers, extnum;
+    int ii, driver, handle, hdutyp, slen, movetotype, extvers, extnum;
     char extname[FLEN_VALUE];
     LONGLONG filesize;
     char urltype[MAX_PREFIX_LEN], infile[FLEN_FILENAME], outfile[FLEN_FILENAME];
@@ -79,14 +79,6 @@ int ffomem(fitsfile **fptr,      /* O - FITS file pointer                   */
 
     if (need_to_initialize)           /* this is called only once */
     {
-        if (need_to_initialize != 1) {
-	  /* This is bad. looks like memory has been corrupted. */
-	  ffpmsg("Vital CFITSIO parameters held in memory have been corrupted!!");
-	  ffpmsg("Fatal condition detected in ffomem.");
-	  *status = FILE_NOT_OPENED;
-	  return(*status);
-	}
-	
         *status = fits_init_cfitsio();
 
         if (*status > 0)
@@ -112,8 +104,10 @@ int ffomem(fitsfile **fptr,      /* O - FITS file pointer                   */
     }
 
     /* call driver routine to open the memory file */
+    FFLOCK;  /* lock this while searching for vacant handle */
     *status =   mem_openmem( buffptr, buffsize,deltasize,
                             mem_realloc,  &handle);
+    FFUNLOCK;
 
     if (*status > 0)
     {
@@ -183,6 +177,29 @@ int ffomem(fitsfile **fptr,      /* O - FITS file pointer                   */
         free(*fptr);
         *fptr = 0;              /* return null file pointer */
         return(*status = MEMORY_ALLOCATION);
+    }
+
+    /* mem for file I/O buffers */
+    ((*fptr)->Fptr)->iobuffer = (char *) calloc(NIOBUF, IOBUFLEN);
+
+    if ( !(((*fptr)->Fptr)->iobuffer) )
+    {
+        (*driverTable[driver].close)(handle);  /* close the file */
+        ffpmsg("failed to allocate memory for iobuffer array: (ffomem)");
+        ffpmsg(url);
+        free( ((*fptr)->Fptr)->headstart);    /* free memory for headstart array */
+        free( ((*fptr)->Fptr)->filename);
+        free((*fptr)->Fptr);
+        free(*fptr);
+        *fptr = 0;              /* return null file pointer */
+        return(*status = MEMORY_ALLOCATION);
+    }
+
+    /* initialize the ageindex array (relative age of the I/O buffers) */
+    /* and initialize the bufrecnum array as being empty */
+    for (ii = 0; ii < NIOBUF; ii++)  {
+        ((*fptr)->Fptr)->ageindex[ii] = ii;
+        ((*fptr)->Fptr)->bufrecnum[ii] = -1;
     }
 
         /* store the parameters describing the file */
@@ -410,7 +427,7 @@ int ffopen(fitsfile **fptr,      /* O - FITS file pointer                   */
 */
 {
     fitsfile *newptr;
-    int  driver, hdutyp, hdunum, slen, writecopy, isopen;
+    int  ii, driver, hdutyp, hdunum, slen, writecopy, isopen;
     LONGLONG filesize;
     long rownum, nrows, goodrows;
     int extnum, extvers, handle, movetotype, tstatus = 0, only_one = 0;
@@ -475,15 +492,6 @@ int ffopen(fitsfile **fptr,      /* O - FITS file pointer                   */
     writecopy = 0;  /* have we made a write-able copy of the input file? */
 
     if (need_to_initialize) {          /* this is called only once */
-    
-       if (need_to_initialize != 1) {
-	  /* This is bad. looks like memory has been corrupted. */
-	  ffpmsg("Vital CFITSIO parameters held in memory have been corrupted!!");
-	  ffpmsg("Fatal condition detected in ffopen.");
-	  *status = FILE_NOT_OPENED;
-	  return(*status);
-       }
-	
        *status = fits_init_cfitsio();
     }
     
@@ -593,8 +601,9 @@ int ffopen(fitsfile **fptr,      /* O - FITS file pointer                   */
         return(*status);
     }
 
-    if (isopen) 
+    if (isopen) {
        goto move2hdu;  
+    }
 
     /* get the driver number corresponding to this urltype */
     *status = urltype2driver(urltype, &driver);
@@ -646,7 +655,9 @@ int ffopen(fitsfile **fptr,      /* O - FITS file pointer                   */
     /* call appropriate driver to open the file */
     if (driverTable[driver].open)
     {
+        FFLOCK;  /* lock this while searching for vacant handle */
         *status =  (*driverTable[driver].open)(infile, mode, &handle);
+        FFUNLOCK;
         if (*status > 0)
         {
             ffpmsg("failed to find or open the following file: (ffopen)");
@@ -724,6 +735,30 @@ int ffopen(fitsfile **fptr,      /* O - FITS file pointer                   */
         *fptr = 0;              /* return null file pointer */
         return(*status = MEMORY_ALLOCATION);
     }
+
+    /* mem for file I/O buffers */
+    ((*fptr)->Fptr)->iobuffer = (char *) calloc(NIOBUF, IOBUFLEN);
+
+    if ( !(((*fptr)->Fptr)->iobuffer) )
+    {
+        (*driverTable[driver].close)(handle);  /* close the file */
+        ffpmsg("failed to allocate memory for iobuffer array: (ffopen)");
+        ffpmsg(url);
+        free( ((*fptr)->Fptr)->headstart);    /* free memory for headstart array */
+        free( ((*fptr)->Fptr)->filename);
+        free((*fptr)->Fptr);
+        free(*fptr);
+        *fptr = 0;              /* return null file pointer */
+        return(*status = MEMORY_ALLOCATION);
+    }
+
+    /* initialize the ageindex array (relative age of the I/O buffers) */
+    /* and initialize the bufrecnum array as being empty */
+    for (ii = 0; ii < NIOBUF; ii++)  {
+        ((*fptr)->Fptr)->ageindex[ii] = ii;
+        ((*fptr)->Fptr)->bufrecnum[ii] = -1;
+    }
+
         /* store the parameters describing the file */
     ((*fptr)->Fptr)->MAXHDU = 1000;              /* initial size of headstart */
     ((*fptr)->Fptr)->filehandle = handle;        /* file handle */
@@ -1261,12 +1296,14 @@ int fits_store_Fptr(FITSfile *Fptr,  /* O - FITS file pointer               */
     if (*status > 0)
         return(*status);
 
+    FFLOCK;
     for (ii = 0; ii < NMAXFILES; ii++) {
         if (FptrTable[ii] == 0) {
             FptrTable[ii] = Fptr;
             break;
         }
     }
+    FFUNLOCK;
     return(*status);
 }
 /*--------------------------------------------------------------------------*/
@@ -1328,6 +1365,18 @@ int fits_already_open(fitsfile **fptr, /* I/O - FITS file pointer       */
     char tmpinfile[FLEN_FILENAME];
 
     *isopen = 0;
+
+/*  When opening a file with readonly access then we simply let
+    the operating system open the file again, instead of using the CFITSIO
+    trick of attaching to the previously opened file.  This is required
+    if CFITSIO is running in a multi-threaded environment, because 2 different
+    threads cannot share the same FITSfile pointer.
+    
+    If the file is opened/reopened with write access, then the file MUST
+    only be physically opened once..
+*/ 
+    if (mode == 0)
+        return(*status);
 
     if(strcasecmp(urltype,"FILE://") == 0)
       {
@@ -3035,6 +3084,7 @@ int ffparsecompspec(fitsfile *fptr,  /* I - FITS file pointer               */
                                    G = GZIP
                                    H = HCOMPRESS
                                    HS = HCOMPRESS (with smoothing)
+				   B - BZIP2
                                    P = PLIO
 
     myfile.fits[compress TYPE 100,100] - the numbers give the dimensions
@@ -3091,6 +3141,15 @@ when writing FITS images.
            ptr1++;
 
     }
+/*
+    else if (*ptr1 == 'b' || *ptr1 == 'B')
+    {
+        compresstype = BZIP2_1;
+        while (*ptr1 != ' ' && *ptr1 != ';' && *ptr1 != '\0') 
+           ptr1++;
+
+    }
+*/
     else if (*ptr1 == 'p' || *ptr1 == 'P')
     {
         compresstype = PLIO_1;
@@ -3217,7 +3276,7 @@ int ffinit(fitsfile **fptr,      /* O - FITS file pointer                   */
   Create and initialize a new FITS file.
 */
 {
-    int driver, slen, clobber = 0;
+    int ii, driver, slen, clobber = 0;
     char *url;
     char urltype[MAX_PREFIX_LEN], outfile[FLEN_FILENAME];
     char tmplfile[FLEN_FILENAME], compspec[80];
@@ -3235,16 +3294,7 @@ int ffinit(fitsfile **fptr,      /* O - FITS file pointer                   */
     *fptr = 0;              /* initialize null file pointer */
 
     if (need_to_initialize)  {          /* this is called only once */
-    
-       if (need_to_initialize != 1) {
-	  /* This is bad. looks like memory has been corrupted. */
-	  ffpmsg("Vital CFITSIO parameters held in memory have been corrupted!!");
-	  ffpmsg("Fatal condition detected in ffinit.");
-	  *status = FILE_NOT_CREATED;
-	  return(*status);
-       }
-	
-       *status = fits_init_cfitsio();
+        *status = fits_init_cfitsio();
     }
 
     if (*status > 0)
@@ -3317,7 +3367,9 @@ int ffinit(fitsfile **fptr,      /* O - FITS file pointer                   */
         /* call appropriate driver to create the file */
     if (driverTable[driver].create)
     {
+        FFLOCK;  /* lock this while searching for vacant handle */
         *status = (*driverTable[driver].create)(outfile, &handle);
+        FFUNLOCK;
         if (*status)
         {
             ffpmsg("failed to create new file (already exists?):");
@@ -3386,6 +3438,29 @@ int ffinit(fitsfile **fptr,      /* O - FITS file pointer                   */
         return(*status = MEMORY_ALLOCATION);
     }
 
+    /* mem for file I/O buffers */
+    ((*fptr)->Fptr)->iobuffer = (char *) calloc(NIOBUF, IOBUFLEN);
+
+    if ( !(((*fptr)->Fptr)->iobuffer) )
+    {
+        (*driverTable[driver].close)(handle);  /* close the file */
+        ffpmsg("failed to allocate memory for iobuffer array: (ffinit)");
+        ffpmsg(url);
+        free( ((*fptr)->Fptr)->headstart);    /* free memory for headstart array */
+        free( ((*fptr)->Fptr)->filename);
+        free((*fptr)->Fptr);
+        free(*fptr);
+        *fptr = 0;              /* return null file pointer */
+        return(*status = MEMORY_ALLOCATION);
+    }
+
+    /* initialize the ageindex array (relative age of the I/O buffers) */
+    /* and initialize the bufrecnum array as being empty */
+    for (ii = 0; ii < NIOBUF; ii++)  {
+        ((*fptr)->Fptr)->ageindex[ii] = ii;
+        ((*fptr)->Fptr)->bufrecnum[ii] = -1;
+    }
+
         /* store the parameters describing the file */
     ((*fptr)->Fptr)->MAXHDU = 1000;              /* initial size of headstart */
     ((*fptr)->Fptr)->filehandle = handle;        /* store the file pointer */
@@ -3428,7 +3503,7 @@ int ffimem(fitsfile **fptr,      /* O - FITS file pointer                   */
   Create and initialize a new FITS file in memory
 */
 {
-    int driver, slen;
+    int ii, driver, slen;
     char urltype[MAX_PREFIX_LEN];
     int handle;
 
@@ -3438,15 +3513,6 @@ int ffimem(fitsfile **fptr,      /* O - FITS file pointer                   */
     *fptr = 0;              /* initialize null file pointer */
 
     if (need_to_initialize)    {        /* this is called only once */
-
-       if (need_to_initialize != 1) {
-	  /* This is bad. looks like memory has been corrupted. */
-	  ffpmsg("Vital CFITSIO parameters held in memory have been corrupted!!");
-	  ffpmsg("Fatal condition detected in ffimem.");
-	  *status = FILE_NOT_CREATED;
-	  return(*status);
-       }
-	
        *status = fits_init_cfitsio();
     }
     
@@ -3464,8 +3530,10 @@ int ffimem(fitsfile **fptr,      /* O - FITS file pointer                   */
     }
 
     /* call driver routine to "open" the memory file */
+    FFLOCK;  /* lock this while searching for vacant handle */
     *status =   mem_openmem( buffptr, buffsize, deltasize,
                             mem_realloc,  &handle);
+    FFUNLOCK;
 
     if (*status > 0)
     {
@@ -3514,12 +3582,34 @@ int ffimem(fitsfile **fptr,      /* O - FITS file pointer                   */
     if ( !(((*fptr)->Fptr)->headstart) )
     {
         (*driverTable[driver].close)(handle);  /* close the file */
-        ffpmsg("failed to allocate memory for headstart array: (ffinit)");
+        ffpmsg("failed to allocate memory for headstart array: (ffimem)");
         free( ((*fptr)->Fptr)->filename);
         free((*fptr)->Fptr);
         free(*fptr);
         *fptr = 0;              /* return null file pointer */
         return(*status = MEMORY_ALLOCATION);
+    }
+
+    /* mem for file I/O buffers */
+    ((*fptr)->Fptr)->iobuffer = (char *) calloc(NIOBUF, IOBUFLEN);
+
+    if ( !(((*fptr)->Fptr)->iobuffer) )
+    {
+        (*driverTable[driver].close)(handle);  /* close the file */
+        ffpmsg("failed to allocate memory for iobuffer array: (ffimem)");
+        free( ((*fptr)->Fptr)->headstart);    /* free memory for headstart array */
+        free( ((*fptr)->Fptr)->filename);
+        free((*fptr)->Fptr);
+        free(*fptr);
+        *fptr = 0;              /* return null file pointer */
+        return(*status = MEMORY_ALLOCATION);
+    }
+
+    /* initialize the ageindex array (relative age of the I/O buffers) */
+    /* and initialize the bufrecnum array as being empty */
+    for (ii = 0; ii < NIOBUF; ii++)  {
+        ((*fptr)->Fptr)->ageindex[ii] = ii;
+        ((*fptr)->Fptr)->bufrecnum[ii] = -1;
     }
 
         /* store the parameters describing the file */
@@ -3552,7 +3642,12 @@ int fits_init_cfitsio(void)
       char cval[2];
     } u;
 
-    need_to_initialize = 0;
+    FFLOCK;   /* lockout other threads while executing this critical */
+              /* section of code  */
+    if (need_to_initialize == 0) { /* already initialized? */
+      FFUNLOCK;
+      return(0);
+    }
 
     /*   test for correct byteswapping.   */
 
@@ -3565,6 +3660,7 @@ int fits_init_cfitsio(void)
       printf(" Check the MACHINE and BYTESWAPPED definitions in fitsio2.h\n");
       printf(" Please report this problem to the CFITSIO developers.\n");
       printf(  "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+      FFUNLOCK;
       return(1);
     }
     
@@ -3578,6 +3674,7 @@ int fits_init_cfitsio(void)
       printf("   sizeof(LONGLONG) = %d\n",(int)sizeof(LONGLONG));
       printf(" Please report this problem to the CFITSIO developers.\n");
       printf(  "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+      FFUNLOCK;
       return(1);
     }
 
@@ -3609,6 +3706,7 @@ int fits_init_cfitsio(void)
     if (status)
     {
         ffpmsg("failed to register the file:// driver (init_cfitsio)");
+        FFUNLOCK;
         return(status);
     }
 
@@ -3635,12 +3733,13 @@ int fits_init_cfitsio(void)
     if (status)
     {
         ffpmsg("failed to register the mem:// driver (init_cfitsio)");
+        FFUNLOCK;
         return(status);
     }
 
     /* 3--------------input pre-existing memory file driver----------------*/
     status = fits_register_driver("memkeep://", 
-            mem_init,
+            NULL,
             mem_shutdown,
             mem_setoptions,
             mem_getoptions, 
@@ -3661,6 +3760,7 @@ int fits_init_cfitsio(void)
     if (status)
     {
         ffpmsg("failed to register the memkeep:// driver (init_cfitsio)");
+        FFUNLOCK;
         return(status);
     }
 
@@ -3668,7 +3768,7 @@ int fits_init_cfitsio(void)
    /*  the stdin stream is copied to memory then opened in memory */
 
     status = fits_register_driver("stdin://", 
-            mem_init,
+            NULL,
             mem_shutdown,
             mem_setoptions,
             mem_getoptions, 
@@ -3688,6 +3788,7 @@ int fits_init_cfitsio(void)
     if (status)
     {
         ffpmsg("failed to register the stdin:// driver (init_cfitsio)");
+        FFUNLOCK;
         return(status);
     }
 
@@ -3695,7 +3796,7 @@ int fits_init_cfitsio(void)
    /*  the stdin stream is copied to a disk file then the disk file is opened */
 
     status = fits_register_driver("stdinfile://", 
-            mem_init,
+            NULL,
             mem_shutdown,
             mem_setoptions,
             mem_getoptions, 
@@ -3719,13 +3820,14 @@ int fits_init_cfitsio(void)
     if (status)
     {
         ffpmsg("failed to register the stdinfile:// driver (init_cfitsio)");
+        FFUNLOCK;
         return(status);
     }
 
 
     /* 6-----------------------stdout stream driver------------------*/
     status = fits_register_driver("stdout://",
-            mem_init,
+            NULL,
             mem_shutdown,
             mem_setoptions,
             mem_getoptions, 
@@ -3745,12 +3847,13 @@ int fits_init_cfitsio(void)
     if (status)
     {
         ffpmsg("failed to register the stdout:// driver (init_cfitsio)");
+        FFUNLOCK;
         return(status);
     }
 
     /* 7------------------iraf disk file to memory driver -----------*/
     status = fits_register_driver("irafmem://",
-            mem_init,
+            NULL,
             mem_shutdown,
             mem_setoptions,
             mem_getoptions, 
@@ -3770,12 +3873,13 @@ int fits_init_cfitsio(void)
     if (status)
     {
         ffpmsg("failed to register the irafmem:// driver (init_cfitsio)");
+        FFUNLOCK;
         return(status);
     }
 
     /* 8------------------raw binary file to memory driver -----------*/
     status = fits_register_driver("rawfile://",
-            mem_init,
+            NULL,
             mem_shutdown,
             mem_setoptions,
             mem_getoptions, 
@@ -3795,12 +3899,13 @@ int fits_init_cfitsio(void)
     if (status)
     {
         ffpmsg("failed to register the rawfile:// driver (init_cfitsio)");
+        FFUNLOCK;
         return(status);
     }
 
     /* 9------------------compressed disk file to memory driver -----------*/
     status = fits_register_driver("compress://",
-            mem_init,
+            NULL,
             mem_shutdown,
             mem_setoptions,
             mem_getoptions, 
@@ -3820,6 +3925,7 @@ int fits_init_cfitsio(void)
     if (status)
     {
         ffpmsg("failed to register the compress:// driver (init_cfitsio)");
+        FFUNLOCK;
         return(status);
     }
 
@@ -3827,7 +3933,7 @@ int fits_init_cfitsio(void)
     /*  Identical to compress://, except it allows READWRITE access      */
 
     status = fits_register_driver("compressmem://",
-            mem_init,
+            NULL,
             mem_shutdown,
             mem_setoptions,
             mem_getoptions, 
@@ -3847,12 +3953,13 @@ int fits_init_cfitsio(void)
     if (status)
     {
         ffpmsg("failed to register the compressmem:// driver (init_cfitsio)");
+        FFUNLOCK;
         return(status);
     }
 
     /* 11------------------compressed disk file to disk file driver -------*/
     status = fits_register_driver("compressfile://",
-            file_init,
+            NULL,
             file_shutdown,
             file_setoptions,
             file_getoptions, 
@@ -3876,12 +3983,13 @@ int fits_init_cfitsio(void)
     if (status)
     {
         ffpmsg("failed to register the compressfile:// driver (init_cfitsio)");
+        FFUNLOCK;
         return(status);
     }
 
     /* 12---create file in memory, then compress it to disk file on close--*/
     status = fits_register_driver("compressoutfile://", 
-            mem_init,
+            NULL,
             mem_shutdown,
             mem_setoptions,
             mem_getoptions, 
@@ -3903,6 +4011,7 @@ int fits_init_cfitsio(void)
     {
         ffpmsg(
         "failed to register the compressoutfile:// driver (init_cfitsio)");
+        FFUNLOCK;
         return(status);
     }
 
@@ -3933,12 +4042,13 @@ int fits_init_cfitsio(void)
     if (status)
     {
         ffpmsg("failed to register the root:// driver (init_cfitsio)");
+        FFUNLOCK;
         return(status);
     }
 
     /* 14--------------------http  driver-----------------------*/
     status = fits_register_driver("http://",
-            mem_init,
+            NULL,
             mem_shutdown,
             mem_setoptions,
             mem_getoptions, 
@@ -3958,13 +4068,14 @@ int fits_init_cfitsio(void)
     if (status)
     {
         ffpmsg("failed to register the http:// driver (init_cfitsio)");
+        FFUNLOCK;
         return(status);
     }
 
     /* 15--------------------http file driver-----------------------*/
 
     status = fits_register_driver("httpfile://",
-            file_init,
+            NULL,
             file_shutdown,
             file_setoptions,
             file_getoptions, 
@@ -3988,13 +4099,14 @@ int fits_init_cfitsio(void)
     if (status)
     {
         ffpmsg("failed to register the httpfile:// driver (init_cfitsio)");
+        FFUNLOCK;
         return(status);
     }
 
     /* 16--------------------http memory driver-----------------------*/
     /*  same as http:// driver, except memory file can be opened READWRITE */
     status = fits_register_driver("httpmem://",
-            mem_init,
+            NULL,
             mem_shutdown,
             mem_setoptions,
             mem_getoptions, 
@@ -4014,13 +4126,14 @@ int fits_init_cfitsio(void)
     if (status)
     {
         ffpmsg("failed to register the httpmem:// driver (init_cfitsio)");
+        FFUNLOCK;
         return(status);
     }
 
     /* 17--------------------httpcompress file driver-----------------------*/
 
     status = fits_register_driver("httpcompress://",
-            mem_init,
+            NULL,
             mem_shutdown,
             mem_setoptions,
             mem_getoptions, 
@@ -4040,13 +4153,14 @@ int fits_init_cfitsio(void)
     if (status)
     {
         ffpmsg("failed to register the httpcompress:// driver (init_cfitsio)");
+        FFUNLOCK;
         return(status);
     }
 
 
     /* 18--------------------ftp driver-----------------------*/
     status = fits_register_driver("ftp://",
-            mem_init,
+            NULL,
             mem_shutdown,
             mem_setoptions,
             mem_getoptions, 
@@ -4066,12 +4180,13 @@ int fits_init_cfitsio(void)
     if (status)
     {
         ffpmsg("failed to register the ftp:// driver (init_cfitsio)");
+        FFUNLOCK;
         return(status);
     }
 
     /* 19--------------------ftp file driver-----------------------*/
     status = fits_register_driver("ftpfile://",
-            file_init,
+            NULL,
             file_shutdown,
             file_setoptions,
             file_getoptions, 
@@ -4095,13 +4210,14 @@ int fits_init_cfitsio(void)
     if (status)
     {
         ffpmsg("failed to register the ftpfile:// driver (init_cfitsio)");
+        FFUNLOCK;
         return(status);
     }
 
     /* 20--------------------ftp mem driver-----------------------*/
     /*  same as ftp:// driver, except memory file can be opened READWRITE */
     status = fits_register_driver("ftpmem://",
-            mem_init,
+            NULL,
             mem_shutdown,
             mem_setoptions,
             mem_getoptions, 
@@ -4121,12 +4237,13 @@ int fits_init_cfitsio(void)
     if (status)
     {
         ffpmsg("failed to register the ftpmem:// driver (init_cfitsio)");
+        FFUNLOCK;
         return(status);
     }
 
     /* 21--------------------ftp compressed file driver------------------*/
     status = fits_register_driver("ftpcompress://",
-            mem_init,
+            NULL,
             mem_shutdown,
             mem_setoptions,
             mem_getoptions, 
@@ -4146,6 +4263,7 @@ int fits_init_cfitsio(void)
     if (status)
     {
         ffpmsg("failed to register the ftpcompress:// driver (init_cfitsio)");
+        FFUNLOCK;
         return(status);
     }
       /* === End of net drivers section === */  
@@ -4177,6 +4295,7 @@ int fits_init_cfitsio(void)
     if (status)
     {
         ffpmsg("failed to register the shmem:// driver (init_cfitsio)");
+        FFUNLOCK;
         return(status);
     }
 
@@ -4211,6 +4330,7 @@ int fits_init_cfitsio(void)
     if (status)
     {
         ffpmsg("failed to register the gsiftp:// driver (init_cfitsio)");
+        FFUNLOCK;
         return(status);
     }
 
@@ -4238,9 +4358,14 @@ int fits_init_cfitsio(void)
     if (status)
     {
         ffpmsg("failed to register the stream:// driver (init_cfitsio)");
+        FFUNLOCK;
         return(status);
     }
 
+    /* reset flag.  Any other threads will now not need to call this routine */
+    need_to_initialize = 0;
+
+    FFUNLOCK;
     return(status);
 }
 /*--------------------------------------------------------------------------*/
@@ -4283,7 +4408,7 @@ int fits_register_driver(char *prefix,
 
     if (init != NULL)		
     { 
-        status = (*init)();
+        status = (*init)();  /* initialize the driver */
         if (status)
             return(status);
     }
@@ -6152,6 +6277,11 @@ char *fits_split_names(
     ^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^
       1st name               2nd name    3rd name
 
+
+NOTE:  This routine is not thread-safe.  
+This routine is simply provided as a utility routine for other external
+software. It is not used by any CFITSIO routine.
+
 */
     int depth = 0;
     char *start;
@@ -6230,8 +6360,7 @@ int ffclos(fitsfile *fptr,      /* I - FITS file pointer */
         ffflsh(fptr, TRUE, status);   /* flush and disassociate IO buffers */
 
         /* call driver function to actually close the file */
-        if (
-   (*driverTable[(fptr->Fptr)->driver].close)((fptr->Fptr)->filehandle) )
+        if ((*driverTable[(fptr->Fptr)->driver].close)((fptr->Fptr)->filehandle))
         {
             if (*status <= 0)
             {
@@ -6243,6 +6372,7 @@ int ffclos(fitsfile *fptr,      /* I - FITS file pointer */
         }
 
         fits_clear_Fptr( fptr->Fptr, status);  /* clear Fptr address */
+        free((fptr->Fptr)->iobuffer);    /* free memory for I/O buffers */
         free((fptr->Fptr)->headstart);    /* free memory for headstart array */
         free((fptr->Fptr)->filename);     /* free memory for the filename */
         (fptr->Fptr)->filename = 0;
@@ -6321,6 +6451,7 @@ int ffdelt(fitsfile *fptr,      /* I - FITS file pointer */
     }
 
     fits_clear_Fptr( fptr->Fptr, status);  /* clear Fptr address */
+    free((fptr->Fptr)->iobuffer);    /* free memory for I/O buffers */
     free((fptr->Fptr)->headstart);    /* free memory for headstart array */
     free((fptr->Fptr)->filename);     /* free memory for the filename */
     (fptr->Fptr)->filename = 0;

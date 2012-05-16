@@ -112,11 +112,13 @@ int fits_hcompress(int *a, int ny, int nx, int scale, char *output,
 
   /* encode and write to output array */
 
+  FFLOCK;
   noutmax = *nbytes;  /* input value is the allocated size of the array */
   *nbytes = 0;  /* reset */
 
   stat = encode(output, nbytes, a, nx, ny, scale);
-
+  FFUNLOCK;
+  
   *status = stat;
   return(*status);
 }
@@ -156,10 +158,13 @@ int fits_hcompress64(LONGLONG *a, int ny, int nx, int scale, char *output,
   digitize64(a, nx, ny, scale);
 
   /* encode and write to output array */
+
+  FFLOCK;
   noutmax = *nbytes;  /* input value is the allocated size of the array */
   *nbytes = 0;  /* reset */
 
   stat = encode64(output, nbytes, a, nx, ny, scale);
+  FFUNLOCK;
 
   *status = stat;
   return(*status);

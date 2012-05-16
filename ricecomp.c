@@ -872,6 +872,7 @@ static int *nonzero_count = (int *)NULL;
 
     bbits = 1<<fsbits;
 
+    FFLOCK;
     if (nonzero_count == (int *) NULL) {
 	/*
 	 * nonzero_count is lookup table giving number of bits
@@ -882,6 +883,7 @@ static int *nonzero_count = (int *)NULL;
 	nonzero_count = (int *) malloc(256*sizeof(int));
 	if (nonzero_count == (int *) NULL) {
             ffpmsg("rdecomp: insufficient memory");
+            FFUNLOCK;
 	    return 1;
 	}
 	nzero = 8;
@@ -892,6 +894,8 @@ static int *nonzero_count = (int *)NULL;
 	    nzero--;
 	}
     }
+    FFUNLOCK;
+
     /*
      * Decode in blocks of nblock pixels
      */
@@ -1062,6 +1066,7 @@ static int *nonzero_count = (int *)NULL;
 
     bbits = 1<<fsbits;
 
+    FFLOCK;
     if (nonzero_count == (int *) NULL) {
 	/*
 	 * nonzero_count is lookup table giving number of bits
@@ -1072,6 +1077,7 @@ static int *nonzero_count = (int *)NULL;
 	nonzero_count = (int *) malloc(256*sizeof(int));
 	if (nonzero_count == (int *) NULL) {
             ffpmsg("rdecomp: insufficient memory");
+	    FFUNLOCK;
 	    return 1;
 	}
 	nzero = 8;
@@ -1082,6 +1088,7 @@ static int *nonzero_count = (int *)NULL;
 	    nzero--;
 	}
     }
+    FFUNLOCK;
     /*
      * Decode in blocks of nblock pixels
      */
@@ -1249,6 +1256,7 @@ static int *nonzero_count = (int *)NULL;
 
     bbits = 1<<fsbits;
 
+    FFLOCK;
     if (nonzero_count == (int *) NULL) {
 	/*
 	 * nonzero_count is lookup table giving number of bits
@@ -1259,6 +1267,7 @@ static int *nonzero_count = (int *)NULL;
 	nonzero_count = (int *) malloc(256*sizeof(int));
 	if (nonzero_count == (int *) NULL) {
             ffpmsg("rdecomp: insufficient memory");
+	    FFUNLOCK;
 	    return 1;
 	}
 	nzero = 8;
@@ -1269,6 +1278,7 @@ static int *nonzero_count = (int *)NULL;
 	    nzero--;
 	}
     }
+    FFUNLOCK;
     /*
      * Decode in blocks of nblock pixels
      */

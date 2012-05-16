@@ -54,17 +54,27 @@ SERVICES PROVIDED HEREUNDER."
 #define PutMesg    5 /* add a new message to the stack */
 #define PutMark    6 /* add a marker to the stack */
 
+#ifdef _REENTRANT
+/*
+    Fitsio_Lock and Fitsio_Pthread_Status are declared in fitsio2.h. 
+*/
+pthread_mutex_t Fitsio_Lock;
+int Fitsio_Pthread_Status = 0;
+
+#endif
+
 /*--------------------------------------------------------------------------*/
 float ffvers(float *version)  /* IO - version number */
 /*
   return the current version number of the FITSIO software
 */
 {
-      *version = (float) 3.14;
+      *version = (float) 3.181;
 
-/*     18 Mar 2009
+/*     12 May (BETA release of thread-safe version)
 
    Previous releases:
+      *version = 3.14    18 Mar 2009 
       *version = 3.13     5 Jan 2009 
       *version = 3.12     8 Oct 2008 
       *version = 3.11    19 Sep 2008 
@@ -699,6 +709,8 @@ PutMark    6  add a marker to the stack
     static char errbuff[errmsgsiz][81];  /* initialize all = \0 */
     static int nummsg = 0;
 
+    FFLOCK;
+    
     if (action == DelAll)  /* clear the whole message stack */
     {
       for (ii = 0; ii < nummsg; ii ++)
@@ -737,8 +749,10 @@ PutMark    6  add a marker to the stack
          for (ii = 0; ii < nummsg; ii++)
              txtbuff[ii] = txtbuff[ii + 1]; /* shift remaining pointers */
 
-         if (errmsg[0] != ESMARKER)   /* quit if this is not a marker */
+         if (errmsg[0] != ESMARKER) {   /* quit if this is not a marker */
+            FFUNLOCK;
             return;
+         }
        }
        errmsg[0] = '\0';  /*  no messages in the stack */
     }
@@ -806,6 +820,8 @@ PutMark    6  add a marker to the stack
       nummsg++;
 
     }
+
+    FFUNLOCK;
     return;
 }
 /*--------------------------------------------------------------------------*/
@@ -6482,6 +6498,7 @@ int ffwend(fitsfile *fptr,       /* I - FITS file pointer */
     for (ii=0; ii < nspace; ii++)
     {
         ffgbyt(fptr, 80, keyrec, &tstatus);  /* get next keyword */
+        if (tstatus) break;
         if (strncmp(keyrec, blankkey, 80) && strncmp(keyrec, endkey, 80))
             break;
     }
