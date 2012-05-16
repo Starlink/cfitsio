@@ -1,5 +1,102 @@
                    Log of Changes Made to CFITSIO
 
+Version 3.26 - 30 December 2010
+
+  Enhancements
+
+   - defined 2 new macros in fitsio.h:  
+       #define CFITSIO_MAJOR 3
+       #define CFITSIO_MINOR 26
+     These may be used within other macros to detect the CFITSIO
+     version number at compile time.
+     
+   - modified group.c to initialize the output URL to a null string in 
+     fits_url2relurl.  Also added more robust tests to see if 2 file
+     pointers point to the same file.
+
+   - enhanced the template keyword parsing code in grparser.c to support
+     the 'D' exponent character in the ASCII representation of floating
+     point keyword values (as in TVAL = 1.23D03).  Previously, the parser
+     would have writen this keyword with a string value (TVAL = '1.23D03').
+
+   - modified the low-level routines that write a keyword record to a FITS 
+     header so that they silently replace any illegal characters (ASCII 
+     values less than 32 or greater than 126) with an ASCII space character.
+     Previously, these routines would have returned with an error when
+     encountering these illegal characters in the keyword record (most commonly 
+     tab, carriage return, and line feed characters).
+
+   - made substantial internal changes to imcompress.c in preparation for
+     possible future support for compression methods for FITS tables analogous
+     to the tiled image compression method.
+
+   - replaced all the source code in CFITSIO that was distributed under the
+     GNU General Public License with freely available code.  In particular,
+     the  gzip file compression and uncompression code was replaced by the
+     zlib compression library.  Thus, beginning with this version 3.26 of CFITSIO,
+     other software applications may freely use CFITSIO without necessarily
+     incurring any GNU licensing requirement.  See the License.txt file for
+     the CFITSIO licensing requirements.
+
+   - added support for using cfitsio in different 'locales' which use a
+     comma, not a period, as the decimal point character in ASCII 
+     representation of a floating point number (e.g., France).  This
+     affects how floating point keyword values and floating point numbers
+     in ASCII tables are read and written with the 'printf' and 'strtod'
+     functions.
+
+   - added a new utility routine called fits_copy_rows/ffcprw that copies
+     a specified range of rows from one table to another.
+
+   - enhanced the test for illegal ASCII characters in a header (fftrec) to
+     print out the name of the offending character (e.g TAB or Line Feed) as
+     well as the Hex value of the chracter.
+     
+   - modified ffgtbc (in fitscore.c) to support nonstandard vector variable
+     length array columns in binary tables (e.g. with TFORMn = 2000PE(500)').
+     
+   - modified the configure file to add "-lm" when linking CFITSIO on
+     Solaris machines.
+     
+   - added new routine, fits_get_inttype, to parse an integer keyword value
+     string and return the minimum integer datatype (TBYTE, TSHORT, TLONG, 
+     TLONGLONG) required to store the integer value.
+
+   - added new routine, fits_convert_hdr2str, which is similar to fits_hdr2str
+     except that if the input HDU is a tile compressed image (stored 
+     in a binary table) then it will first convert that header back to 
+     that of a normal uncompressed FITS image before concatenating the header
+     keyword records.
+
+   - modified the file template reading routine (ngp_line_from_file in 
+     grparser.c) so that it ignores any carriage return characters (\r)
+     in the line, that might be present, e.g. if the file was created on a 
+     Windows machine that uses \r\n as end of line characters.
+
+   - modified the ffoptplt routine in cfileio.c to check if the PCOUNT
+     keyword in the template file has a non-zero value, and if so, resets
+     it to zero in the newly created file.
+
+   Bug Fixes
+   
+   - fixed a bug when uncompressing floating-point images that contain Nan
+     values on some 64-bit platforms.
+     
+   - fixed a bug when updating the value of the CRPIXn world coordinate 
+     system keywords when extracting a subimage from larger FITS image, using the
+     extended CFITSIO syntax (e.g.  myimage[1:500:2, 1:500:2]).  This bug only 
+     affects casee where the pixel increment value is not equal to 1, and caused
+     the coordinate grid to be shifted by between 0.25 pixels (in the case of
+     a pixel increment of 2) and 0.5 pixels (for large pixel increment values).
+
+   - fixed a potential string buffer overflow error in the ffmkls routine
+     that modifies the value and comment strings in a keyword that uses
+     the HEASARC long string keyword convention. 
+
+   - fixed a bug in imcompress.c that could cause programs to abort on 64-bit 
+     machines when using gzip to tile-compress images.  Changed the declaration
+     of clen in imcomp_compress_tile from int to size_t.
+
 Version 3.25 - 9 June 2010
 
    - fixed bug that was introduced in version 3.13 that broke the ability
@@ -30,6 +127,8 @@ Version 3.25 - 9 June 2010
    - some compilers define CLOCKS_PER_SEC as a double instead of an integer,
      so added an explicted integer type conversion to 2 statements in
      imcompress.c that used this macro.
+     
+   - removed debugging printf statements in drvrnet.c (15 July)
 
 Version 3.24 - 26 January 2010
 
