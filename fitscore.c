@@ -73,11 +73,12 @@ float ffvers(float *version)  /* IO - version number */
   return the current version number of the FITSIO software
 */
 {
-      *version = (float) 3.34;
+      *version = (float) 3.35;
 
-/*       20 Mar 2013
+/*       23 May 2013
 
    Previous releases:
+      *version = 3.34    20 Mar 2013
       *version = 3.33    14 Feb 2013
       *version = 3.32       Oct 2012
       *version = 3.31    18 Jul 2012
@@ -4896,7 +4897,7 @@ int ffbinit(fitsfile *fptr,     /* I - FITS file pointer */
     /* the next HDU begins in the next logical block after the data  */
     (fptr->Fptr)->headstart[ (fptr->Fptr)->curhdu + 1] = 
          (fptr->Fptr)->datastart +
-         ( (rowlen * nrows + pcount + 2879) / 2880 * 2880 );
+	 ( ((fptr->Fptr)->heapstart + (fptr->Fptr)->heapsize + 2879) / 2880 * 2880 );
 
     /* determine the byte offset to the beginning of each column */
     ffgtbc(fptr, &totalwidth, status);
@@ -6980,7 +6981,7 @@ int ffcrhd(fitsfile *fptr,      /* I - FITS file pointer */
        
        /* reset the dithering offset that may have been calculated for the */
        /* previous HDU back to the requested default value */
-       (fptr->Fptr)->dither_offset = (fptr->Fptr)->request_dither_offset;
+       (fptr->Fptr)->dither_seed = (fptr->Fptr)->request_dither_seed;
     }
 
     return(*status);
@@ -9218,6 +9219,7 @@ int ffc2rr(const char *cval,   /* I - string representation of the value */
     char *loc, msg[81], tval[73];
     struct lconv *lcc = 0;
     static char decimalpt = 0;
+    short *sptr, iret;
 
     if (*status > 0)           /* inherit input status value if > 0 */
         return(*status);
@@ -9257,11 +9259,18 @@ int ffc2rr(const char *cval,   /* I - string representation of the value */
         *status = BAD_C2F;   
     }
 
-    if (errno == ERANGE)
+    sptr = (short *) fval;
+#if BYTESWAPPED && MACHINE != VAXVMS && MACHINE != ALPHAVMS
+    sptr++;       /* point to MSBs */
+#endif
+    iret = fnan(*sptr);  /* if iret == 1, then the float value is a NaN */
+
+    if (errno == ERANGE || (iret == 1) )
     {
         strcpy(msg,"Error in ffc2rr converting string to float: ");
         strncat(msg,cval,30);
         ffpmsg(msg);
+	*fval = 0.;
 
         *status = NUM_OVERFLOW;
         errno = 0;
@@ -9280,6 +9289,7 @@ int ffc2dd(const char *cval,   /* I - string representation of the value */
     char *loc, msg[81], tval[73];
     struct lconv *lcc = 0;
     static char decimalpt = 0;
+    short *sptr, iret;
 
     if (*status > 0)           /* inherit input status value if > 0 */
         return(*status);
@@ -9318,11 +9328,18 @@ int ffc2dd(const char *cval,   /* I - string representation of the value */
         *status = BAD_C2D;   
     }
 
-    if (errno == ERANGE)
+    sptr = (short *) dval;
+#if BYTESWAPPED && MACHINE != VAXVMS && MACHINE != ALPHAVMS
+    sptr += 3;       /* point to MSBs */
+#endif
+    iret = dnan(*sptr);  /* if iret == 1, then the double value is a NaN */
+
+    if (errno == ERANGE || (iret == 1) )
     {
         strcpy(msg,"Error in ffc2dd converting string to double: ");
         strncat(msg,cval,30);
         ffpmsg(msg);
+	*dval = 0.;
 
         *status = NUM_OVERFLOW;
         errno = 0;

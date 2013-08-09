@@ -63,6 +63,7 @@ pthread_mutex_t Fitsio_InitLock = PTHREAD_MUTEX_INITIALIZER;
 int fitsio_init_lock(void)
 {
   static int need_to_init = 1;
+  int status;
   
 #ifdef _REENTRANT
 
@@ -74,16 +75,30 @@ int fitsio_init_lock(void)
 
     /* Init the main fitsio lock here since we need a a recursive lock */
 
-    assert(!pthread_mutexattr_init(&mutex_init));
-#ifdef linux
-    assert(!pthread_mutexattr_settype(&mutex_init,
-				     PTHREAD_MUTEX_RECURSIVE_NP));
-#else
-    assert(!pthread_mutexattr_settype(&mutex_init,
-				     PTHREAD_MUTEX_RECURSIVE));
-#endif
+    status = pthread_mutexattr_init(&mutex_init);
+    if (status) {
+        ffpmsg("pthread_mutexattr_init failed (fitsio_init_lock)");
+        return(status);
+    }
 
-    assert(!pthread_mutex_init(&Fitsio_Lock,&mutex_init));
+#ifdef linux
+    status = pthread_mutexattr_settype(&mutex_init,
+				     PTHREAD_MUTEX_RECURSIVE_NP);
+#else
+    status = pthread_mutexattr_settype(&mutex_init,
+				     PTHREAD_MUTEX_RECURSIVE);
+#endif
+    if (status) {
+        ffpmsg("pthread_mutexattr_settu[e failed (fitsio_init_lock)");
+        return(status);
+    }
+
+    status = pthread_mutex_init(&Fitsio_Lock,&mutex_init);
+    if (status) {
+        ffpmsg("pthread_mutex_init failed (fitsio_init_lock)");
+        return(status);
+    }
+
     need_to_init = 0;
   }
 
@@ -434,7 +449,7 @@ int ffiopn(fitsfile **fptr,      /* O - FITS file pointer                   */
     return(*status);
 }
 /*--------------------------------------------------------------------------*/
-int ffopentest(double version,   /* I - CFITSIO version number, from the    */
+int ffopentest(int soname,       /* I - CFITSIO shared library version     */
                                  /*     application program (fitsio.h file) */
            fitsfile **fptr,      /* O - FITS file pointer                   */ 
            const char *name,     /* I - full name of file to open           */
@@ -442,18 +457,21 @@ int ffopentest(double version,   /* I - CFITSIO version number, from the    */
            int *status)          /* IO - error status                       */
 /*
   Open an existing FITS file with either readonly or read/write access.
-  First test that the version of fitsio.h used to build the CFITSIO library
-  is the same as the version used in building the application program that
+  First test that the SONAME of fitsio.h used to build the CFITSIO library
+  is the same as was used in compiling the application program that
   links to the library.
 */
-{
-    if (version != CFITSIO_VERSION)
+{ 
+    if (soname != CFITSIO_SONAME)
     {
-        printf("ERROR: Mismatch in the version of the fitsio.h include file used to build\n");
-	printf("the CFITSIO library, and the version included by the application program:\n");
-	printf("   Version used to build the CFITSIO library   = %f\n",CFITSIO_VERSION);
-	printf("   Version included by the application program = %f\n",version);
-	
+        printf("\nERROR: Mismatch in the CFITSIO_SONAME value in the fitsio.h include file\n");
+	printf("that was used to build the CFITSIO library, and the value in the include file\n");
+	printf("that was used when compiling the application program:\n");
+	printf("   Version used to build the CFITSIO library   = %d\n",CFITSIO_SONAME);
+	printf("   Version included by the application program = %d\n",soname);
+	printf("\nFix this by recompiling and then relinking this application program \n");
+	printf("with the CFITSIO library.\n");
+
         *status = FILE_NOT_OPENED;
 	return(*status);
     }
@@ -495,7 +513,6 @@ int ffopen(fitsfile **fptr,      /* O - FITS file pointer                   */
     char errmsg[FLEN_ERRMSG];
     char *hdtype[3] = {"IMAGE", "TABLE", "BINTABLE"};
     char *rowselect = 0;
-    long tilesize[MAX_COMPRESS_DIM] = {0,1,1,1,1,1};
 
     if (*status > 0)
         return(*status);
@@ -1304,15 +1321,11 @@ move2hdu:
        }
     }
 
-    /* set default image compression tile size */
-    fits_set_tile_dim(*fptr, MAX_COMPRESS_DIM, tilesize, status);
-
    /* parse and save image compression specification, if given */
    if (*compspec) {
       ffparsecompspec(*fptr, compspec, status);
    }
  
-
     return(*status);
 }
 /*--------------------------------------------------------------------------*/
@@ -1789,7 +1802,7 @@ int ffedit_columns(
     fitsfile *newptr;
     int ii, hdunum, slen, colnum = -1, testnum, deletecol = 0, savecol = 0;
     int numcols = 0, *colindex = 0, tstatus = 0, inparen;
-    char *cptr, *cptr2, *cptr3, clause[FLEN_FILENAME], keyname[FLEN_KEYWORD];
+    char *cptr, *cptr2, *cptr3, *clause = NULL, keyname[FLEN_KEYWORD];
     char colname[FLEN_VALUE], oldname[FLEN_VALUE], colformat[FLEN_VALUE];
     char *file_expr = NULL, testname[FLEN_VALUE], card[FLEN_CARD];
 
@@ -1882,12 +1895,13 @@ int ffedit_columns(
     if (comma2semicolon(cptr)) {
          ffpmsg("parsing error in column filter expression");
          ffpmsg(cptr);
+         if( file_expr ) free( file_expr );
          *status = PARSE_SYNTAX_ERR;
          return(*status);
     }
 
     /* parse expression and get first clause, if more than 1 */
-    while ((slen = fits_get_token(&cptr, ";", clause, NULL)) > 0 )
+    while ((slen = fits_get_token2(&cptr, ";", &clause, NULL, status)) > 0 )
     {
         if( *cptr==';' ) cptr++;
         clause[slen] = '\0';
@@ -1907,6 +1921,7 @@ int ffedit_columns(
                     ffpmsg(clause);
                     if( colindex ) free( colindex );
                     if( file_expr ) free( file_expr );
+		    if( clause ) free(clause);
                     return(*status);
                 }
                 deletecol = 1; /* set flag that at least one col was deleted */
@@ -1924,6 +1939,7 @@ int ffedit_columns(
                     ffpmsg(clause);
                     if( colindex ) free( colindex );
                     if( file_expr ) free( file_expr );
+		    if( clause ) free(clause);
                     return(*status);
                 }
             }
@@ -1943,13 +1959,13 @@ int ffedit_columns(
             cptr2 = clause;
             slen = fits_get_token(&cptr2, "( =", colname, NULL);
 
-
             if (slen == 0)
             {
                 ffpmsg("error: column or keyword name is blank:");
                 ffpmsg(clause);
                 if( colindex ) free( colindex );
                 if( file_expr ) free( file_expr );
+		if (clause) free(clause);
                 return(*status= URL_PARSE_ERROR);
             }
 
@@ -1968,6 +1984,8 @@ int ffedit_columns(
 		    ffpmsg(colname);
 		    ffpmsg("is invalid unless a column has been previously");
 		    ffpmsg("created or editted by a calculator command");
+                    if( file_expr ) free( file_expr );
+		    if (clause) free(clause);
 		    return(*status = URL_PARSE_ERROR);
 		  }
 		colname[strlen(colname)-1] = '\0';
@@ -1997,7 +2015,11 @@ int ffedit_columns(
  		    testname[strlen(testname)-1] = '\0';
 		    /* Make keyword name and put it in oldname */
 		    ffkeyn(testname, colnum, oldname, status);
-		    if (*status) return (*status);
+		    if (*status) {
+                      if( file_expr ) free( file_expr );
+		      if (clause) free(clause);
+		      return (*status);
+		    }
 
 		    tstatus = 0;
 		    if (!fits_read_card(*fptr, oldname, card, &tstatus)) {
@@ -2078,6 +2100,7 @@ int ffedit_columns(
                ffpmsg(cptr2);
                if( colindex ) free( colindex );
                if( file_expr ) free( file_expr );
+	       if (clause) free(clause);
                return(*status = URL_PARSE_ERROR);
               }
             }
@@ -2117,6 +2140,7 @@ int ffedit_columns(
                       ffpmsg(colname);
                       if( colindex ) free( colindex );
                       if( file_expr ) free( file_expr );
+	              if (clause) free(clause);
                       return(*status);
                     }
                     /* keep this column in the output file */
@@ -2137,6 +2161,7 @@ int ffedit_columns(
                         ffpmsg(clause);
                         if( colindex ) free( colindex );
                         if( file_expr ) free( file_expr );
+			if (clause) free(clause);
                         return(*status);
                     }
                 }
@@ -2169,7 +2194,10 @@ int ffedit_columns(
        	                        status) > 0) {
 				
                         ffpmsg("Unable to calculate expression");
-                        return(*status);
+                        if( colindex ) free( colindex );
+                        if( file_expr ) free( file_expr );
+			if (clause) free(clause);
+                         return(*status);
                 }
 
                 /* test if this is a column and not a keyword */
@@ -2194,6 +2222,8 @@ int ffedit_columns(
               }
             }
         }
+	if (clause) free(clause);  /* free old clause before getting new one */
+        clause = NULL;
     }
 
     if (savecol && !deletecol)
@@ -2209,6 +2239,7 @@ int ffedit_columns(
              ffpmsg(clause);
              if( colindex ) free( colindex );
              if( file_expr ) free( file_expr );
+	     if (clause) free(clause);
              return(*status);
            }
          }
@@ -2217,6 +2248,8 @@ int ffedit_columns(
 
     if( colindex ) free( colindex );
     if( file_expr ) free( file_expr );
+    if (clause) free(clause);
+
     return(*status);
 }
 /*--------------------------------------------------------------------------*/
@@ -3408,9 +3441,10 @@ when writing FITS images.
 
     /* initialize with default values */
     int ii, compresstype = RICE_1, smooth = 0;
-    long tilesize[MAX_COMPRESS_DIM] = {0,1,1,1,1,1};
-    float qlevel = 0.0, scale = 0.;
-
+    int quantize_method = SUBTRACTIVE_DITHER_1;
+    long tilesize[MAX_COMPRESS_DIM] = {0,0,0,0,0,0};
+    float qlevel = -99., scale = 0.;
+    
     ptr1 = compspec;
     while (*ptr1 == ' ')    /* ignore leading blanks */
            ptr1++;
@@ -3518,6 +3552,16 @@ when writing FITS images.
                 /* this should be the floating point quantization parameter */
 
                   ptr1++;
+                  if (*ptr1 == 'z' || *ptr1 == 'Z') {
+                      /* use the subtractive_dither_2 option */
+                      quantize_method = SUBTRACTIVE_DITHER_2;
+                      ptr1++;
+		  } else if (*ptr1 == '0') {
+                      /* do not dither */
+                      quantize_method = NO_DITHER;
+                      ptr1++;
+		  }
+
                   while (*ptr1 == ' ')    /* ignore leading blanks */
                       ptr1++;
 
@@ -3544,9 +3588,11 @@ when writing FITS images.
         fits_set_hcomp_smooth(fptr, smooth, status);
     }
 
-    if (qlevel != 0.0)
+    if (qlevel != -99.) {
         fits_set_quantize_level(fptr, qlevel, status);
-    
+        fits_set_quantize_method(fptr, quantize_method, status);
+    }
+
     return(*status);
 }
 /*--------------------------------------------------------------------------*/
@@ -3582,7 +3628,6 @@ int ffinit(fitsfile **fptr,      /* O - FITS file pointer                   */
     char urltype[MAX_PREFIX_LEN], outfile[FLEN_FILENAME];
     char tmplfile[FLEN_FILENAME], compspec[80];
     int handle, create_disk_file = 0;
-    long tilesize[MAX_COMPRESS_DIM] = {0,1,1,1,1,1};
 
     if (*status > 0)
         return(*status);
@@ -3669,9 +3714,11 @@ int ffinit(fitsfile **fptr,      /* O - FITS file pointer                   */
         /* call appropriate driver to create the file */
     if (driverTable[driver].create)
     {
+
         FFLOCK;  /* lock this while searching for vacant handle */
         *status = (*driverTable[driver].create)(outfile, &handle);
         FFUNLOCK;
+
         if (*status)
         {
             ffpmsg("failed to create new file (already exists?):");
@@ -3784,9 +3831,6 @@ int ffinit(fitsfile **fptr,      /* O - FITS file pointer                   */
 
     if (tmplfile[0])
         ffoptplt(*fptr, tmplfile, status);
-
-    /* set default image compression tile size */
-    fits_set_tile_dim(*fptr, MAX_COMPRESS_DIM, tilesize, status);
 
     /* parse and save image compression specification, if given */
     if (compspec[0])
@@ -6534,7 +6578,7 @@ int ffimport_file( char *filename,   /* Text file to read                   */
    reallocating memory.
 */
 {
-   int allocLen, totalLen, llen, eoline;
+   int allocLen, totalLen, llen, eoline = 1;
    char *lines,line[256];
    FILE *aFile;
 
@@ -6558,7 +6602,7 @@ int ffimport_file( char *filename,   /* Text file to read                   */
 
    while( fgets(line,256,aFile)!=NULL ) {
       llen = strlen(line);
-      if ((llen > 1) && (line[0] == '/' && line[1] == '/'))
+      if ( eoline && (llen > 1) && (line[0] == '/' && line[1] == '/'))
           continue;       /* skip comment lines begging with // */
 
       eoline = 0;
@@ -6628,7 +6672,8 @@ int fits_get_token(char **ptr,
             *isanumber = 1;
 
 	    if (strchr(token, 'D'))  {
-	        strcpy(tval, token);
+	        strncpy(tval, token, 72);
+		tval[72] = '\0';
 
 	        /*  The C language does not support a 'D'; replace with 'E' */
 	        if (loc = strchr(tval, 'D')) *loc = 'E';
@@ -6636,6 +6681,68 @@ int fits_get_token(char **ptr,
 	        dval =  strtod(tval, &loc);
 	    } else {
 	        dval =  strtod(token, &loc);
+ 	    }
+
+	    /* check for read error, or junk following the value */
+	    if (*loc != '\0' && *loc != ' ' ) *isanumber = 0;
+	    if (errno == ERANGE) *isanumber = 0;
+        }
+    }
+
+    return(slen);
+}
+/*--------------------------------------------------------------------------*/
+int fits_get_token2(char **ptr, 
+                   char *delimiter,
+                   char **token,
+                   int *isanumber,  /* O - is this token a number? */
+		   int *status)
+
+/*
+   parse off the next token, delimited by a character in 'delimiter',
+   from the input ptr string;  increment *ptr to the end of the token.
+   Returns the length of the token, not including the delimiter char;
+
+   This routine allocates the *token string;  the calling routine must free it 
+*/
+{
+    char *loc, tval[73];
+    int slen;
+    double dval;
+    
+    if (*status)
+        return(0);
+	
+    while (**ptr == ' ')  /* skip over leading blanks */
+        (*ptr)++;
+
+    slen = strcspn(*ptr, delimiter);  /* length of next token */
+    if (slen)
+    {
+	*token = (char *) calloc(slen + 1, 1); 
+	if (!(*token)) {
+          ffpmsg("Couldn't allocate memory to hold token string (fits_get_token2).");
+          *status = MEMORY_ALLOCATION ;
+	  return(0);
+        }
+ 
+        strncat(*token, *ptr, slen);       /* copy token */
+        (*ptr) += slen;                   /* skip over the token */
+
+        if (isanumber)  /* check if token is a number */
+        {
+            *isanumber = 1;
+
+	    if (strchr(*token, 'D'))  {
+	        strncpy(tval, *token, 72);
+		tval[72] = '\0';
+
+	        /*  The C language does not support a 'D'; replace with 'E' */
+	        if (loc = strchr(tval, 'D')) *loc = 'E';
+
+	        dval =  strtod(tval, &loc);
+	    } else {
+	        dval =  strtod(*token, &loc);
  	    }
 
 	    /* check for read error, or junk following the value */
