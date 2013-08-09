@@ -310,7 +310,7 @@ ac_includes_default="\
 # include <unistd.h>
 #endif"
 
-ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS INSTALL_ROOT uname_found CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT FC RANLIB ac_ct_RANLIB CPP EGREP SSE_FLAGS GCCVERSION ARCH LIBPRE SHLIB_LD SHLIB_SUFFIX F77_WRAPPERS OPTIONAL_OBJECTS my_shmem LIBOBJS LTLIBOBJS'
+ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS build build_cpu build_vendor build_os host host_cpu host_vendor host_os target target_cpu target_vendor target_os CFITSIO_MAJOR CFITSIO_MINOR CFITSIO_SONAME INSTALL_ROOT CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT FC AR ARCHIVE RANLIB ac_ct_RANLIB CPP EGREP SSE_FLAGS GCCVERSION ARCH LIBPRE SHLIB_LD SHLIB_SUFFIX CFITSIO_SHLIB CFITSIO_SHLIB_SONAME F77_WRAPPERS OPTIONAL_OBJECTS my_shmem LIBOBJS LTLIBOBJS'
 ac_subst_files=''
 
 # Initialize some variables set by options.
@@ -831,6 +831,11 @@ Fine tuning of the installation directories:
 _ACEOF
 
   cat <<\_ACEOF
+
+System types:
+  --build=BUILD     configure for building on BUILD [guessed]
+  --host=HOST       cross-compile to build programs to run on HOST [BUILD]
+  --target=TARGET   configure for building compilers for TARGET [HOST]
 _ACEOF
 fi
 
@@ -1303,6 +1308,124 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
+ac_aux_dir=
+for ac_dir in $srcdir $srcdir/.. $srcdir/../..; do
+  if test -f $ac_dir/install-sh; then
+    ac_aux_dir=$ac_dir
+    ac_install_sh="$ac_aux_dir/install-sh -c"
+    break
+  elif test -f $ac_dir/install.sh; then
+    ac_aux_dir=$ac_dir
+    ac_install_sh="$ac_aux_dir/install.sh -c"
+    break
+  elif test -f $ac_dir/shtool; then
+    ac_aux_dir=$ac_dir
+    ac_install_sh="$ac_aux_dir/shtool install -c"
+    break
+  fi
+done
+if test -z "$ac_aux_dir"; then
+  { { echo "$as_me:$LINENO: error: cannot find install-sh or install.sh in $srcdir $srcdir/.. $srcdir/../.." >&5
+echo "$as_me: error: cannot find install-sh or install.sh in $srcdir $srcdir/.. $srcdir/../.." >&2;}
+   { (exit 1); exit 1; }; }
+fi
+ac_config_guess="$SHELL $ac_aux_dir/config.guess"
+ac_config_sub="$SHELL $ac_aux_dir/config.sub"
+ac_configure="$SHELL $ac_aux_dir/configure" # This should be Cygnus configure.
+
+# Make sure we can run config.sub.
+$ac_config_sub sun4 >/dev/null 2>&1 ||
+  { { echo "$as_me:$LINENO: error: cannot run $ac_config_sub" >&5
+echo "$as_me: error: cannot run $ac_config_sub" >&2;}
+   { (exit 1); exit 1; }; }
+
+echo "$as_me:$LINENO: checking build system type" >&5
+echo $ECHO_N "checking build system type... $ECHO_C" >&6
+if test "${ac_cv_build+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_cv_build_alias=$build_alias
+test -z "$ac_cv_build_alias" &&
+  ac_cv_build_alias=`$ac_config_guess`
+test -z "$ac_cv_build_alias" &&
+  { { echo "$as_me:$LINENO: error: cannot guess build type; you must specify one" >&5
+echo "$as_me: error: cannot guess build type; you must specify one" >&2;}
+   { (exit 1); exit 1; }; }
+ac_cv_build=`$ac_config_sub $ac_cv_build_alias` ||
+  { { echo "$as_me:$LINENO: error: $ac_config_sub $ac_cv_build_alias failed" >&5
+echo "$as_me: error: $ac_config_sub $ac_cv_build_alias failed" >&2;}
+   { (exit 1); exit 1; }; }
+
+fi
+echo "$as_me:$LINENO: result: $ac_cv_build" >&5
+echo "${ECHO_T}$ac_cv_build" >&6
+build=$ac_cv_build
+build_cpu=`echo $ac_cv_build | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\1/'`
+build_vendor=`echo $ac_cv_build | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\2/'`
+build_os=`echo $ac_cv_build | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\3/'`
+
+
+echo "$as_me:$LINENO: checking host system type" >&5
+echo $ECHO_N "checking host system type... $ECHO_C" >&6
+if test "${ac_cv_host+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_cv_host_alias=$host_alias
+test -z "$ac_cv_host_alias" &&
+  ac_cv_host_alias=$ac_cv_build_alias
+ac_cv_host=`$ac_config_sub $ac_cv_host_alias` ||
+  { { echo "$as_me:$LINENO: error: $ac_config_sub $ac_cv_host_alias failed" >&5
+echo "$as_me: error: $ac_config_sub $ac_cv_host_alias failed" >&2;}
+   { (exit 1); exit 1; }; }
+
+fi
+echo "$as_me:$LINENO: result: $ac_cv_host" >&5
+echo "${ECHO_T}$ac_cv_host" >&6
+host=$ac_cv_host
+host_cpu=`echo $ac_cv_host | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\1/'`
+host_vendor=`echo $ac_cv_host | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\2/'`
+host_os=`echo $ac_cv_host | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\3/'`
+
+
+echo "$as_me:$LINENO: checking target system type" >&5
+echo $ECHO_N "checking target system type... $ECHO_C" >&6
+if test "${ac_cv_target+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_cv_target_alias=$target_alias
+test "x$ac_cv_target_alias" = "x" &&
+  ac_cv_target_alias=$ac_cv_host_alias
+ac_cv_target=`$ac_config_sub $ac_cv_target_alias` ||
+  { { echo "$as_me:$LINENO: error: $ac_config_sub $ac_cv_target_alias failed" >&5
+echo "$as_me: error: $ac_config_sub $ac_cv_target_alias failed" >&2;}
+   { (exit 1); exit 1; }; }
+
+fi
+echo "$as_me:$LINENO: result: $ac_cv_target" >&5
+echo "${ECHO_T}$ac_cv_target" >&6
+target=$ac_cv_target
+target_cpu=`echo $ac_cv_target | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\1/'`
+target_vendor=`echo $ac_cv_target | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\2/'`
+target_os=`echo $ac_cv_target | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\3/'`
+
+
+# The aliases save the names the user supplied, while $host etc.
+# will get canonicalized.
+test -n "$target_alias" &&
+  test "$program_prefix$program_suffix$program_transform_name" = \
+    NONENONEs,x,x, &&
+  program_prefix=${target_alias}-
+
+#--------------------------------------------------------------------
+# CFITSIO Version Numbers:
+#--------------------------------------------------------------------
+CFITSIO_MAJOR=3
+
+CFITSIO_MINOR=35
+
+# Increment soname each time the interface changes:
+CFITSIO_SONAME=1
+
 
 #--------------------------------------------------------------------
 # Command options
@@ -1400,99 +1523,53 @@ test "$exec_prefix" != NONE -a "$prefix" != "$exec_prefix" \
 
 
 #--------------------------------------------------------------------
-# Check "uname" to determine system type
+# System type
 #--------------------------------------------------------------------
-# Extract the first word of "uname", so it can be a program name with args.
-set dummy uname; ac_word=$2
-echo "$as_me:$LINENO: checking for $ac_word" >&5
-echo $ECHO_N "checking for $ac_word... $ECHO_C" >&6
-if test "${ac_cv_prog_uname_found+set}" = set; then
-  echo $ECHO_N "(cached) $ECHO_C" >&6
-else
-  if test -n "$uname_found"; then
-  ac_cv_prog_uname_found="$uname_found" # Let the user override the test.
-else
-as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_exec_ext in '' $ac_executable_extensions; do
-  if $as_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
-    ac_cv_prog_uname_found="1"
-    echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-done
 
-  test -z "$ac_cv_prog_uname_found" && ac_cv_prog_uname_found="0"
-fi
-fi
-uname_found=$ac_cv_prog_uname_found
-if test -n "$uname_found"; then
-  echo "$as_me:$LINENO: result: $uname_found" >&5
-echo "${ECHO_T}$uname_found" >&6
-else
-  echo "$as_me:$LINENO: result: no" >&5
-echo "${ECHO_T}no" >&6
-fi
-
-if test $uname_found -eq 0 ; then
-    echo "cfitsio: No uname found; setting system type to unknown."
-    system="unknown"
-else
-    system=`uname -s`-`uname -r`
-fi
-
-case $system in
-    CYGWIN*)
+case $host in
+    *pc-cygwin*)
 	ARCH="cygwin"
 	EXT="cygwin"
 	;;
-    Darwin-*)
+    *apple-darwin*)
 	# Darwin can be powerpc, i386, or x86_64
 	ARCH=`uname -p`
 	EXT="darwin"
 	;;
-    FREEBSD*|FreeBSD*)
+    *freebsd*)
 	ARCH="linux"
 	EXT="lnx"
 	;;
-    HP-UX-*)
+    *hpux*)
 	ARCH="hp"
 	EXT="hpu"
 	;;
-    IRIX*)
+    *irix*)
 	ARCH="sgi"
 	EXT="sgi"
 	;;
-    Linux*)
+    *linux*)
 	ARCH="linux"
 	EXT="lnx"
 	;;
-    MINGW32*)
+    *mingw32*)
 	#ARCH=""
 	EXT="mingw32"
 	;;
-    OSF1*)
+    *osf1*)
 	ARCH="alpha"
 	EXT="osf"
 	;;
-    SunOS-4*)
-	ARCH="sun"
-	EXT="sun"
-	;;
-    SunOS-5*)
+    *solaris*)
 	ARCH="solaris"
 	EXT="sol"
 	;;
-    ULTRIX*)
+    *ultrix*)
 	ARCH="dec"
 	EXT="dec"
 	;;
     *)
-	echo "cfitsio: == Don't know what do do with $system"
+	echo "cfitsio: == Don't know what do do with $host"
 	;;
 esac
 
@@ -2552,6 +2629,52 @@ echo "$as_me: cfitsio: == Adding wrapper support for GNU Fortran by default" >&6
   fi
 fi
 
+# ar & ranlib required
+#---------------------
+# Extract the first word of "ar", so it can be a program name with args.
+set dummy ar; ac_word=$2
+echo "$as_me:$LINENO: checking for $ac_word" >&5
+echo $ECHO_N "checking for $ac_word... $ECHO_C" >&6
+if test "${ac_cv_prog_AR+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  if test -n "$AR"; then
+  ac_cv_prog_AR="$AR" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+  for ac_exec_ext in '' $ac_executable_extensions; do
+  if $as_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_AR="ar"
+    echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+done
+
+  test -z "$ac_cv_prog_AR" && ac_cv_prog_AR="noar"
+fi
+fi
+AR=$ac_cv_prog_AR
+if test -n "$AR"; then
+  echo "$as_me:$LINENO: result: $AR" >&5
+echo "${ECHO_T}$AR" >&6
+else
+  echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6
+fi
+
+if test $AR = noar; then
+  { { echo "$as_me:$LINENO: error: ar not found in your \$PATH. See your sysdamin." >&5
+echo "$as_me: error: ar not found in your \$PATH. See your sysdamin." >&2;}
+   { (exit 1); exit 1; }; }
+fi
+ARCHIVE="$AR rv"
+
+
 if test -n "$ac_tool_prefix"; then
   # Extract the first word of "${ac_tool_prefix}ranlib", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ranlib; ac_word=$2
@@ -3411,15 +3534,15 @@ fi
 CFLAGS="$CFLAGS"
 LIBPRE=""
 
-case $system in
-    CYGWIN*)
+case $host in
+    *pc-cygwin*)
 	CFLAGS="$CFLAGS -DHAVE_POSIX_SIGNALS"
 	;;
-    Darwin-*)
+    *apple-darwin*)
         # Build for i386 & x86_64 architectures on Darwin 10.x or newer:
 
-        case $system in
-            Darwin-[56789]*)
+        case $host in
+            *darwin[56789]*)
                 ;;
             *)
 
@@ -3504,25 +3627,29 @@ _ACEOF
 _ACEOF
 
 	;;
-    HP-UX-*)
+    *hpux*)
 	if test "x$CFORTRANFLAGS" = x ; then
 		CFORTRANFLAGS="-Dappendus"
 	fi
 	CFLAGS="$CFLAGS -DPG_PPU"
 	LIBPRE="-Wl,"
 	;;
-    IRIX*)
+    *irix*)
 	CFLAGS="$CFLAGS -DHAVE_POSIX_SIGNALS"
 	RANLIB="touch"
 	;;
-    Linux*)
+    *linux*)
         # For large file support:
-        $as_echo "#define _LARGEFILE_SOURCE 1" >>confdefs.h
+        cat >>confdefs.h <<\_ACEOF
+#define _LARGEFILE_SOURCE 1
+_ACEOF
 
-        $as_echo "#define _FILE_OFFSET_BITS 64" >>confdefs.h
+        cat >>confdefs.h <<\_ACEOF
+#define _FILE_OFFSET_BITS 64
+_ACEOF
 
 	;;
-    SunOS-5*)
+    *solaris*)
         if test "x$CFORTRANFLAGS" = x ; then
                 CFORTRANFLAGS="-Dsolaris"
         fi
@@ -3612,7 +3739,7 @@ _ACEOF
 
 	;;
     *)
-		echo "cfitsio: == Don't know what do do with $system"
+		echo "cfitsio: == Don't know what do do with $host"
 	;;
 esac
 
@@ -3638,8 +3765,8 @@ echo "$as_me: WARNING: This gcc is pretty old. Disabling optimization to be safe
 	no)
 		echo "cfitsio: Old CFLAGS is $CFLAGS"
 		CFLAGS=`echo $CFLAGS | sed -e "s/-g/-O/"`
-		case $system in
-		    SunOS-5*)
+		case $host in
+		    *solaris*)
 
 			if test `echo $CFLAGS | grep -c fast` -gt 0
 			then
@@ -3650,7 +3777,7 @@ echo "$as_me: WARNING: This gcc is pretty old. Disabling optimization to be safe
          		CFLAGS="$CFLAGS -DHAVE_ALLOCA_H -DHAVE_POSIX_SIGNALS"
 			;;
 		    *)
-			echo "== No special changes for $system"
+			echo "== No special changes for $host"
 			;;
 		esac
 		echo "New CFLAGS is $CFLAGS"
@@ -3664,6 +3791,8 @@ esac
 #-------------------------------------------------------------------------------
 SHLIB_LD=:
 SHLIB_SUFFIX=".so"
+CFITSIO_SHLIB=""
+CFITSIO_SHLIB_SONAME=""
 lhea_shlib_cflags=
 case $EXT in
   cygwin)
@@ -3672,17 +3801,19 @@ case $EXT in
     ;;
   darwin)
 
-    case $system in
-        Darwin-[56789]*)
-            SHLIB_LD="$CC -dynamiclib $CFLAGS"
+    SHLIB_SUFFIX=".dylib"
+    CFITSIO_SHLIB="libcfitsio.\${CFITSIO_SONAME}.\${CFITSIO_MAJOR}.\${CFITSIO_MINOR}\${SHLIB_SUFFIX}"
+    CFITSIO_SHLIB_SONAME="libcfitsio.\${CFITSIO_SONAME}\${SHLIB_SUFFIX}"
+    case $host in
+        *darwin[56789]*)
+            SHLIB_LD="$CC -dynamiclib -install_name libcfitsio.\${CFITSIO_SONAME}\${SHLIB_SUFFIX} -compatibility_version \${CFITSIO_SONAME} -current_version \${CFITSIO_SONAME}.\${CFITSIO_MAJOR}.\${CFITSIO_MINOR} $CFLAGS"
             ;;
         *)
             # Build for i386 & x86_64 architectures on Darwin 10.x or newer:
-            SHLIB_LD="$CC -dynamiclib $C_UNIV_SWITCH $CFLAGS"
+            SHLIB_LD="$CC -dynamiclib $C_UNIV_SWITCH -install_name libcfitsio.\${CFITSIO_SONAME}\${SHLIB_SUFFIX} -compatibility_version \${CFITSIO_SONAME} -current_version \${CFITSIO_SONAME}.\${CFITSIO_MAJOR}.\${CFITSIO_MINOR} $CFLAGS"
             ;;
     esac
 
-    SHLIB_SUFFIX=".dylib"
     lhea_shlib_cflags="-fPIC -fno-common"
     ;;
   hpu)
@@ -3691,6 +3822,8 @@ case $EXT in
     ;;
   lnx)
     SHLIB_LD=":"
+    CFITSIO_SHLIB="libcfitsio\${SHLIB_SUFFIX}.\${CFITSIO_SONAME}.\${CFITSIO_MAJOR}.\${CFITSIO_MINOR}"
+    CFITSIO_SHLIB_SONAME="libcfitsio\${SHLIB_SUFFIX}.\${CFITSIO_SONAME}"
     ;;
   osf)
     SHLIB_LD="ld -shared -expect_unresolved '*' $LDFLAGS"
@@ -3711,13 +3844,15 @@ esac
 # Darwin uses gcc (=cc), but needs different flags (see above)
 if test "x$EXT" != xdarwin && test "x$EXT" != xcygwin && test "x$EXT" != xmingw32; then
   if test "x$GCC" = xyes; then
-    SHLIB_LD="$CC -shared $CFLAGS"
+    SHLIB_LD="$CC -shared -Wl,-soname,libcfitsio\${SHLIB_SUFFIX}.\${CFITSIO_SONAME} $CFLAGS"
     lhea_shlib_cflags='-fPIC'
   fi
 fi
 if test "x$lhea_shlib_cflags" != x; then
   CFLAGS="$CFLAGS $lhea_shlib_cflags"
 fi
+# Set shared library name for cases in which we aren't setting a 'soname':
+if test "x$CFITSIO_SHLIB" = x; then CFITSIO_SHLIB="libcfitsio\${SHLIB_SUFFIX}"; fi
 
 
 # ================= test for the unix ftruncate function ================
@@ -5104,8 +5239,22 @@ s,@ECHO_C@,$ECHO_C,;t t
 s,@ECHO_N@,$ECHO_N,;t t
 s,@ECHO_T@,$ECHO_T,;t t
 s,@LIBS@,$LIBS,;t t
+s,@build@,$build,;t t
+s,@build_cpu@,$build_cpu,;t t
+s,@build_vendor@,$build_vendor,;t t
+s,@build_os@,$build_os,;t t
+s,@host@,$host,;t t
+s,@host_cpu@,$host_cpu,;t t
+s,@host_vendor@,$host_vendor,;t t
+s,@host_os@,$host_os,;t t
+s,@target@,$target,;t t
+s,@target_cpu@,$target_cpu,;t t
+s,@target_vendor@,$target_vendor,;t t
+s,@target_os@,$target_os,;t t
+s,@CFITSIO_MAJOR@,$CFITSIO_MAJOR,;t t
+s,@CFITSIO_MINOR@,$CFITSIO_MINOR,;t t
+s,@CFITSIO_SONAME@,$CFITSIO_SONAME,;t t
 s,@INSTALL_ROOT@,$INSTALL_ROOT,;t t
-s,@uname_found@,$uname_found,;t t
 s,@CC@,$CC,;t t
 s,@CFLAGS@,$CFLAGS,;t t
 s,@LDFLAGS@,$LDFLAGS,;t t
@@ -5114,6 +5263,8 @@ s,@ac_ct_CC@,$ac_ct_CC,;t t
 s,@EXEEXT@,$EXEEXT,;t t
 s,@OBJEXT@,$OBJEXT,;t t
 s,@FC@,$FC,;t t
+s,@AR@,$AR,;t t
+s,@ARCHIVE@,$ARCHIVE,;t t
 s,@RANLIB@,$RANLIB,;t t
 s,@ac_ct_RANLIB@,$ac_ct_RANLIB,;t t
 s,@CPP@,$CPP,;t t
@@ -5124,6 +5275,8 @@ s,@ARCH@,$ARCH,;t t
 s,@LIBPRE@,$LIBPRE,;t t
 s,@SHLIB_LD@,$SHLIB_LD,;t t
 s,@SHLIB_SUFFIX@,$SHLIB_SUFFIX,;t t
+s,@CFITSIO_SHLIB@,$CFITSIO_SHLIB,;t t
+s,@CFITSIO_SHLIB_SONAME@,$CFITSIO_SHLIB_SONAME,;t t
 s,@F77_WRAPPERS@,$F77_WRAPPERS,;t t
 s,@OPTIONAL_OBJECTS@,$OPTIONAL_OBJECTS,;t t
 s,@my_shmem@,$my_shmem,;t t
@@ -6029,8 +6182,22 @@ s,@ECHO_C@,$ECHO_C,;t t
 s,@ECHO_N@,$ECHO_N,;t t
 s,@ECHO_T@,$ECHO_T,;t t
 s,@LIBS@,$LIBS,;t t
+s,@build@,$build,;t t
+s,@build_cpu@,$build_cpu,;t t
+s,@build_vendor@,$build_vendor,;t t
+s,@build_os@,$build_os,;t t
+s,@host@,$host,;t t
+s,@host_cpu@,$host_cpu,;t t
+s,@host_vendor@,$host_vendor,;t t
+s,@host_os@,$host_os,;t t
+s,@target@,$target,;t t
+s,@target_cpu@,$target_cpu,;t t
+s,@target_vendor@,$target_vendor,;t t
+s,@target_os@,$target_os,;t t
+s,@CFITSIO_MAJOR@,$CFITSIO_MAJOR,;t t
+s,@CFITSIO_MINOR@,$CFITSIO_MINOR,;t t
+s,@CFITSIO_SONAME@,$CFITSIO_SONAME,;t t
 s,@INSTALL_ROOT@,$INSTALL_ROOT,;t t
-s,@uname_found@,$uname_found,;t t
 s,@CC@,$CC,;t t
 s,@CFLAGS@,$CFLAGS,;t t
 s,@LDFLAGS@,$LDFLAGS,;t t
@@ -6039,6 +6206,8 @@ s,@ac_ct_CC@,$ac_ct_CC,;t t
 s,@EXEEXT@,$EXEEXT,;t t
 s,@OBJEXT@,$OBJEXT,;t t
 s,@FC@,$FC,;t t
+s,@AR@,$AR,;t t
+s,@ARCHIVE@,$ARCHIVE,;t t
 s,@RANLIB@,$RANLIB,;t t
 s,@ac_ct_RANLIB@,$ac_ct_RANLIB,;t t
 s,@CPP@,$CPP,;t t
@@ -6049,6 +6218,8 @@ s,@ARCH@,$ARCH,;t t
 s,@LIBPRE@,$LIBPRE,;t t
 s,@SHLIB_LD@,$SHLIB_LD,;t t
 s,@SHLIB_SUFFIX@,$SHLIB_SUFFIX,;t t
+s,@CFITSIO_SHLIB@,$CFITSIO_SHLIB,;t t
+s,@CFITSIO_SHLIB_SONAME@,$CFITSIO_SHLIB_SONAME,;t t
 s,@F77_WRAPPERS@,$F77_WRAPPERS,;t t
 s,@OPTIONAL_OBJECTS@,$OPTIONAL_OBJECTS,;t t
 s,@my_shmem@,$my_shmem,;t t

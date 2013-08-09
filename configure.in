@@ -9,6 +9,15 @@
 dnl Process this file with autoconf to produce a configure script.
 AC_INIT
 AC_CONFIG_SRCDIR([fitscore.c])
+AC_CANONICAL_TARGET([])
+
+#--------------------------------------------------------------------
+# CFITSIO Version Numbers:
+#--------------------------------------------------------------------
+AC_SUBST(CFITSIO_MAJOR,3)
+AC_SUBST(CFITSIO_MINOR,35)
+# Increment soname each time the interface changes:
+AC_SUBST(CFITSIO_SONAME,1)
 
 #--------------------------------------------------------------------
 # Command options
@@ -86,64 +95,53 @@ test "$exec_prefix" != NONE -a "$prefix" != "$exec_prefix" \
 	
 
 #--------------------------------------------------------------------
-# Check "uname" to determine system type
+# System type
 #--------------------------------------------------------------------
-AC_CHECK_PROG([uname_found],[uname],[1],[0])
-if test $uname_found -eq 0 ; then
-    echo "cfitsio: No uname found; setting system type to unknown."
-    system="unknown"
-else
-    system=`uname -s`-`uname -r`
-fi
 
-case $system in
-    CYGWIN*)
+case $host in
+    *pc-cygwin*)
 	ARCH="cygwin"
 	EXT="cygwin"
 	;;
-    Darwin-*)
+    *apple-darwin*)
 	# Darwin can be powerpc, i386, or x86_64
 	ARCH=`uname -p`
 	EXT="darwin"
 	;;
-    FREEBSD*|FreeBSD*)
+    *freebsd*)
 	ARCH="linux"
 	EXT="lnx"
 	;;
-    HP-UX-*)
+    *hpux*)
 	ARCH="hp"
 	EXT="hpu"
 	;;
-    IRIX*)
+    *irix*)
 	ARCH="sgi"
 	EXT="sgi"
 	;;
-    Linux*)
+    *linux*)
 	ARCH="linux"
 	EXT="lnx"
 	;;
-    MINGW32*)
+    *mingw32*)
 	#ARCH=""
 	EXT="mingw32"
 	;;
-    OSF1*)
+    *osf1*)
 	ARCH="alpha"
 	EXT="osf"
 	;;
-    SunOS-4*)
-	ARCH="sun"
-	EXT="sun"
-	;;
-    SunOS-5*)
+    *solaris*)
 	ARCH="solaris"
 	EXT="sol"
 	;;
-    ULTRIX*)
+    *ultrix*)
 	ARCH="dec"
 	EXT="dec"
 	;;
     *)
-	echo "cfitsio: == Don't know what do do with $system"
+	echo "cfitsio: == Don't know what do do with $host"
 	;;
 esac
 
@@ -192,6 +190,15 @@ else
   fi
 fi
 
+# ar & ranlib required
+#---------------------
+AC_CHECK_PROG(AR, ar, ar, noar)
+if test $AR = noar; then
+  AC_MSG_ERROR(ar not found in your \$PATH. See your sysdamin.)
+fi
+ARCHIVE="$AR rv"
+AC_SUBST(ARCHIVE)
+
 AC_PROG_RANLIB
 
 OPTIONAL_OBJECTS=
@@ -234,15 +241,15 @@ AC_SUBST(SSE_FLAGS)
 CFLAGS="$CFLAGS"
 LIBPRE=""
 
-case $system in
-    CYGWIN*)
+case $host in
+    *pc-cygwin*)
 	CFLAGS="$CFLAGS -DHAVE_POSIX_SIGNALS"
 	;;
-    Darwin-*)
+    *apple-darwin*)
         # Build for i386 & x86_64 architectures on Darwin 10.x or newer:
         changequote(,)
-        case $system in
-            Darwin-[56789]*)
+        case $host in
+            *darwin[56789]*)
                 ;;
             *)
                 changequote([,])
@@ -265,23 +272,23 @@ case $system in
         AC_DEFINE(_LARGEFILE_SOURCE)
         AC_DEFINE(_FILE_OFFSET_BITS,64)
 	;;
-    HP-UX-*)
+    *hpux*)
 	if test "x$CFORTRANFLAGS" = x ; then
 		CFORTRANFLAGS="-Dappendus"
 	fi
 	CFLAGS="$CFLAGS -DPG_PPU" 
 	LIBPRE="-Wl,"
 	;;
-    IRIX*)
+    *irix*)
 	CFLAGS="$CFLAGS -DHAVE_POSIX_SIGNALS"
 	RANLIB="touch"
 	;;
-    Linux*)
+    *linux*)
         # For large file support:
         AC_DEFINE(_LARGEFILE_SOURCE)
         AC_DEFINE(_FILE_OFFSET_BITS,64)
 	;;
-    SunOS-5*)
+    *solaris*)
         if test "x$CFORTRANFLAGS" = x ; then
                 CFORTRANFLAGS="-Dsolaris"
         fi
@@ -292,7 +299,7 @@ case $system in
         AC_DEFINE(_FILE_OFFSET_BITS,64)
 	;;
     *)
-		echo "cfitsio: == Don't know what do do with $system"
+		echo "cfitsio: == Don't know what do do with $host"
 	;;
 esac
 
@@ -317,8 +324,8 @@ case $GCC in
 	no)
 		echo "cfitsio: Old CFLAGS is $CFLAGS"
 		CFLAGS=`echo $CFLAGS | sed -e "s/-g/-O/"`
-		case $system in
-		    SunOS-5*)
+		case $host in
+		    *solaris*)
 			changequote(,)
 			if test `echo $CFLAGS | grep -c fast` -gt 0
 			then
@@ -329,7 +336,7 @@ case $GCC in
          		CFLAGS="$CFLAGS -DHAVE_ALLOCA_H -DHAVE_POSIX_SIGNALS"
 			;;
 		    *)
-			echo "== No special changes for $system"
+			echo "== No special changes for $host"
 			;;
 		esac
 		echo "New CFLAGS is $CFLAGS"
@@ -343,6 +350,8 @@ esac
 #-------------------------------------------------------------------------------
 SHLIB_LD=:
 SHLIB_SUFFIX=".so"
+CFITSIO_SHLIB=""
+CFITSIO_SHLIB_SONAME=""
 lhea_shlib_cflags=
 case $EXT in
   cygwin)
@@ -350,18 +359,21 @@ case $EXT in
     SHLIB_SUFFIX=".dll"
     ;;
   darwin)
+
     changequote(,)
-    case $system in
-        Darwin-[56789]*)
-            SHLIB_LD="$CC -dynamiclib $CFLAGS"
+    SHLIB_SUFFIX=".dylib"
+    CFITSIO_SHLIB="libcfitsio.\${CFITSIO_SONAME}.\${CFITSIO_MAJOR}.\${CFITSIO_MINOR}\${SHLIB_SUFFIX}"
+    CFITSIO_SHLIB_SONAME="libcfitsio.\${CFITSIO_SONAME}\${SHLIB_SUFFIX}"
+    case $host in
+        *darwin[56789]*)
+            SHLIB_LD="$CC -dynamiclib -install_name libcfitsio.\${CFITSIO_SONAME}\${SHLIB_SUFFIX} -compatibility_version \${CFITSIO_SONAME} -current_version \${CFITSIO_SONAME}.\${CFITSIO_MAJOR}.\${CFITSIO_MINOR} $CFLAGS"
             ;;
         *)
             # Build for i386 & x86_64 architectures on Darwin 10.x or newer:
-            SHLIB_LD="$CC -dynamiclib $C_UNIV_SWITCH $CFLAGS" 
+            SHLIB_LD="$CC -dynamiclib $C_UNIV_SWITCH -install_name libcfitsio.\${CFITSIO_SONAME}\${SHLIB_SUFFIX} -compatibility_version \${CFITSIO_SONAME} -current_version \${CFITSIO_SONAME}.\${CFITSIO_MAJOR}.\${CFITSIO_MINOR} $CFLAGS"
             ;;
     esac
     changequote([,])
-    SHLIB_SUFFIX=".dylib"
     lhea_shlib_cflags="-fPIC -fno-common"
     ;;
   hpu)
@@ -370,6 +382,8 @@ case $EXT in
     ;;
   lnx)
     SHLIB_LD=":"
+    CFITSIO_SHLIB="libcfitsio\${SHLIB_SUFFIX}.\${CFITSIO_SONAME}.\${CFITSIO_MAJOR}.\${CFITSIO_MINOR}"
+    CFITSIO_SHLIB_SONAME="libcfitsio\${SHLIB_SUFFIX}.\${CFITSIO_SONAME}"
     ;;
   osf)
     SHLIB_LD="ld -shared -expect_unresolved '*' $LDFLAGS"
@@ -389,13 +403,15 @@ esac
 # Darwin uses gcc (=cc), but needs different flags (see above)
 if test "x$EXT" != xdarwin && test "x$EXT" != xcygwin && test "x$EXT" != xmingw32; then
   if test "x$GCC" = xyes; then
-    SHLIB_LD="$CC -shared $CFLAGS"
+    SHLIB_LD="$CC -shared -Wl,-soname,libcfitsio\${SHLIB_SUFFIX}.\${CFITSIO_SONAME} $CFLAGS"
     lhea_shlib_cflags='-fPIC'
   fi
 fi
 if test "x$lhea_shlib_cflags" != x; then
   CFLAGS="$CFLAGS $lhea_shlib_cflags"
 fi
+# Set shared library name for cases in which we aren't setting a 'soname':
+if test "x$CFITSIO_SHLIB" = x; then CFITSIO_SHLIB="libcfitsio\${SHLIB_SUFFIX}"; fi
 
 AC_SUBST(ARCH)dnl
 AC_SUBST(CFLAGS)dnl
@@ -404,6 +420,8 @@ AC_SUBST(FC)dnl
 AC_SUBST(LIBPRE)dnl
 AC_SUBST(SHLIB_LD)dnl
 AC_SUBST(SHLIB_SUFFIX)dnl
+AC_SUBST(CFITSIO_SHLIB)dnl
+AC_SUBST(CFITSIO_SHLIB_SONAME)dnl
 AC_SUBST(F77_WRAPPERS)dnl
 AC_SUBST(OPTIONAL_OBJECTS)dnl
 
