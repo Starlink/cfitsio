@@ -1,5 +1,34 @@
                    Log of Changes Made to CFITSIO
 
+
+Version 3.34 - 20 March 2013
+
+   - modified configure and configure.in to support cross-compiled cfitsio 
+     as a static library for Windows on a Linux platform using MXE 
+     (http://mxe.cc) - a build environment for mingw32. (contributed by 
+     Niels Kristian Bech Jensen)
+
+   - added conditional compilation statementsfor the mingw32 environment in 
+     drvrfile.c because mingw32 does not include the ftello and fseeko functions. 
+     (contributed by Niels Kristian Bech Jensen)
+
+   - fixed a potential bug in ffcpcl (routine to copy a column from one table
+     to another table) when dealing with the rare case of a '0X' column (zero
+     length bit column).
+
+   - fixed an issue in the routines that update or modify string-valued
+     keyword values, as a result of the change to ffc2s in the previous 
+     release.  These routines would exit with a 204 error status if the 
+     current value of the keyword to be updated or modified is null.
+
+   - fixed typo in the previous modification that was intended to ignore
+     numerical overflows in Hcompress when decompressing an image.
+
+   - moved the 'startcol' static variable out of the ffgcnn routine and
+     instead added it as a member of the 'FITSfile' structure that is defined
+     in fitsio.h.  This removes a possible race condition in ffgcnn in 
+     multi-threaded environments.
+
 Version 3.33 - 14 Feb 2013
 
    - modified the imcomp_decompress_tile routine to ignore any numerical 

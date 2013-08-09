@@ -855,12 +855,8 @@ int imcomp_init_table(fitsfile *outfptr,
     
     for (ii = 0; ii < naxis; ii++) {
         if (actual_tilesize[ii] <= 0) {
-	    /* tile size of 0 means use the image size for the 1st axis, and 1 for higher axes */
-          if (ii == 0) {
+	    /* tile size of 0 means use the image size of that dimension */
             actual_tilesize[ii] = naxes[ii];
-          } else {
-            actual_tilesize[ii] = 1;
-          }
 	}
     }
 
@@ -5946,7 +5942,7 @@ int imcomp_decompress_tile (fitsfile *infptr,
 	    */
 	       
             if ((infptr->Fptr)->compress_type == HCOMPRESS_1) {
-	        if (*status = NUM_OVERFLOW) *status = 0;
+	        if (*status == NUM_OVERFLOW) *status = 0;
 	    }
           }
         else if (tiledatatype == TSHORT)
