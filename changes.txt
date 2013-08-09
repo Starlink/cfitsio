@@ -1,5 +1,90 @@
                    Log of Changes Made to CFITSIO
 
+Version 3.33 - 14 Feb 2013
+
+   - modified the imcomp_decompress_tile routine to ignore any numerical 
+     overflows that might occur when using Hcompress to decompress the
+     image.  If Hcompress is used in its 'lossy' mode, the uncompressed
+     image pixel values may slightly exceed the range of an integer*2 
+     variable. This is generally of no consequence, so we can safely ignore
+     any overflows in this case and just clip the values to the legal range.
+
+   - the default tiling pattern when writing a tile-compressed image
+     has been changed.  The old behaviour was to compress the whole image
+     as one single large tile.  This is often not optimal when dealing
+     with large images, so the new default behavior is to treat each
+     row of the image as one tile.  This is the same default behavior
+     as in the standalone fpack program.  The default tile size can
+     be overridden by calling fits_set_tile_dim.
+
+   - fixed bug bug that resulted in a corrupted output FITS image when
+     attempting to write a float or double array of values to a 
+     tile-compressed integer data type image.  CFITSIO does not support
+     implicit data type conversion in this case and now correctly
+     returns an appropriate error status. 
+
+   - modified ricecomp.c to define the nonzero_count lookup table as an 
+     external variable, rather then dynamically allocating it within the
+     3 routines that use it.  This simplifies the code and eliminates the
+     need for special thread locking and unlocking statements. (Thanks to
+     Lars Kr. Lundin for this suggestion). 
+
+   - modifed how the uncompressed size of a gzipped file is computed in the
+     mem_compress_open routine in drvrmem.c.  Since gzip only uses 4 bytes
+     in the compressed file header to store the original file size, one may
+     need to apply a modulo 2^32 byte correction in some cases.  The logic
+     here was modified to allow for corner cases (e.g., very small files, and 
+     when running on 32-bit platforms that do not support files larger than
+     2^31 bytes in size). 
+
+   - added new public routine to construct a 80 keyword record from the 3 input
+     component strings, i.e, the keyword name string, the value string, and
+     the comment string: fits_make_key/ffmkky.  (This was already an undocumented
+     internal routine in previous versions of CFITSIO).
+
+   - modified ffc2s so that if the input keyword value string is a null string,
+     then it will return a VALUE_UNDEFINED (204) status value.  This makes it
+     consistent with the behavior when attempting to read a null keyword 
+     (which has no value) as a logical or as a number (which also returns
+     the 204 error).  This should only affect cases where the header keyword
+     does not have an equal sign followed by a space character in columns 9
+     and 10 of the header record.
+
+   - Changed the "char *" parameter declarations to "const char *" in many 
+     of the routines (mainly the routines that modify or update keywords) to
+     avoid compiler warnings or errors from C++ programs that tend to be more
+     rigorous about using "const char *" when appropriate.
+
+   - added support for caching uncompressed image tiles, so that the tile does
+     not need to be uncompressed again if the application program wants 
+     to read more data from the same tile. This required changes to the
+     main FITS file structure that is defined in fitsio.h, as well as
+     changes to imcompress.c.
+
+   - enhanced the previous modification to drvrfile.c to handle additional user
+     cases when running in the HEASARC's Hera environment.
+
+Version 3.32 - Oct 2012
+
+   - fixed flaw in the way logical columns (TFORM = 'L') in binary tables 
+     were read which caused an illegal value of 1 in the column to be interpreted
+     as a 'T' (TRUE) value.
+
+   - extended the column filtering syntax in the CFITSIO file name parser to
+     enable users and scripts to append new COMMENT or HISTORY keyword into the
+     header of the filtered file (provided by Craig Markwardt).  For example,
+     fcopy "infile.fits[col #HISTORY='Processed on 2012-10-05']" outfile.fits
+     will append this header keyword: "HISTORY Processed on 2012-10-05"
+
+   - small change to the code that opens and reads an ASCII region file to
+     return an error if the file is empty.
+
+   - fixed obscure sign propagation error when attempting to read the
+     uncompressed size of a gzipped FITS file.  This resulted in a memory
+     allocation error if the gzipped file had an uncompressed file
+     size between 2^31 and 2^32 bytes.  Fix supplied by Gudlaugur Johannesson 
+     (Stanford).
+
 Version 3.31 - 18 July 2012
 
    - enhanced the CFITSIO column filtering syntax to allow the comma, in addition
