@@ -15,9 +15,9 @@ AC_CANONICAL_TARGET([])
 # CFITSIO Version Numbers:
 #--------------------------------------------------------------------
 AC_SUBST(CFITSIO_MAJOR,3)
-AC_SUBST(CFITSIO_MINOR,35)
+AC_SUBST(CFITSIO_MINOR,36)
 # Increment soname each time the interface changes:
-AC_SUBST(CFITSIO_SONAME,1)
+AC_SUBST(CFITSIO_SONAME,2)
 
 #--------------------------------------------------------------------
 # Command options
@@ -288,6 +288,15 @@ case $host in
         AC_DEFINE(_LARGEFILE_SOURCE)
         AC_DEFINE(_FILE_OFFSET_BITS,64)
 	;;
+    *mingw32*)
+        AC_MSG_CHECKING([for large file support])
+        AC_COMPILE_IFELSE([AC_LANG_PROGRAM([#include <stdio.h>],
+            [_FILE_OFFSET_BITS_SET_FSEEKO])],[
+            AC_DEFINE(_LARGEFILE_SOURCE)
+            AC_DEFINE(_FILE_OFFSET_BITS,64)
+            AC_MSG_RESULT(yes)
+        ],[AC_MSG_RESULT(no)])
+        ;;
     *solaris*)
         if test "x$CFORTRANFLAGS" = x ; then
                 CFORTRANFLAGS="-Dsolaris"
