@@ -29,6 +29,8 @@
 #define USE_SYSTEM_RAND
 #endif
 
+int simplerng_poisson_small(double lambda);
+int simplerng_poisson_large(double lambda);
 double simplerng_getuniform_pr(unsigned int *u, unsigned int *v);
 unsigned int simplerng_getuint_pr(unsigned int *u, unsigned int *v);
 double simplerng_logfactorial(int n);
@@ -82,7 +84,7 @@ unsigned int simplerng_getuint_pr(unsigned int *u, unsigned int *v)
 }
 
 /* Get uniform deviate [0,1] */
-double simplerng_getuniform()
+double simplerng_getuniform(void)
 {
 #ifdef USE_SYSTEM_RAND
   return rand()*(1.0 / ((double)RAND_MAX + 1));
@@ -160,7 +162,7 @@ int simplerng_poisson_large(double lambda)
      Journal of the Royal Statistical Society Series C (Applied Statistics) Vol. 28, No. 1. (1979)
      The article is on pages 29-35. The algorithm given here is on page 32. */
   static double beta, alpha, k;
-  static old_lambda = -999999;
+  static double old_lambda = -999999.;
 
   if (lambda != old_lambda) {
     double c = 0.767 - 3.36/lambda;
