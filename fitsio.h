@@ -34,10 +34,10 @@ SERVICES PROVIDED HEREUNDER."
 #ifndef _FITSIO_H
 #define _FITSIO_H
 
-#define CFITSIO_VERSION 3.38
-#define CFITSIO_MINOR 38
+#define CFITSIO_VERSION 3.39
+#define CFITSIO_MINOR 39
 #define CFITSIO_MAJOR 3
-#define CFITSIO_SONAME 4
+#define CFITSIO_SONAME 5
 
 /* the SONAME is incremented in a new release if the binary shared */
 /* library (on linux and Mac systems) is not backward compatible */
@@ -772,6 +772,8 @@ int CFITS_API ffopen(fitsfile **fptr, const char *filename, int iomode, int *sta
 int CFITS_API ffopentest(int soname, fitsfile **fptr, const char *filename, int iomode, int *status);
 
 int CFITS_API ffdopn(fitsfile **fptr, const char *filename, int iomode, int *status);
+int CFITS_API ffeopn(fitsfile **fptr, const char *filename, int iomode, 
+     char *extlist, int *hdutype, int *status);
 int CFITS_API fftopn(fitsfile **fptr, const char *filename, int iomode, int *status);
 int CFITS_API ffiopn(fitsfile **fptr, const char *filename, int iomode, int *status);
 int CFITS_API ffdkopn(fitsfile **fptr, const char *filename, int iomode, int *status);
@@ -938,7 +940,10 @@ int CFITS_API ffgkey(fitsfile *fptr, const char *keyname, char *keyval, char *co
 int CFITS_API ffgky( fitsfile *fptr, int datatype, const char *keyname, void *value,
            char *comm, int *status);
 int CFITS_API ffgkys(fitsfile *fptr, const char *keyname, char *value, char *comm, int *status);
+int CFITS_API ffgksl(fitsfile *fptr, const char *keyname, int *length, int *status);
 int CFITS_API ffgkls(fitsfile *fptr, const char *keyname, char **value, char *comm, int *status);
+int CFITS_API ffgsky(fitsfile *fptr, const char *keyname, int firstchar, int maxchar,
+               char *value, int *valuelen, char *comm, int *status);
 int CFITS_API fffree(void *value,  int  *status); 
 int CFITS_API fffkls(char *value, int *status);
 int CFITS_API ffgkyl(fitsfile *fptr, const char *keyname, int *value, char *comm, int *status);
@@ -1848,7 +1853,20 @@ int CFITS_API ffhist2(fitsfile **fptr, char *outfile, int imagetype, int naxis,
            char binname[4][FLEN_VALUE], 
            double weightin, char wtcol[FLEN_VALUE],
            int recip, char *rowselect, int *status);
-
+CFITS_API fitsfile *ffhist3(fitsfile *fptr, 
+           char *outfile, int imagetype,  int naxis,     
+           char colname[4][FLEN_VALUE],  
+           double *minin,     
+           double *maxin,     
+           double *binsizein, 
+           char minname[4][FLEN_VALUE], 
+           char maxname[4][FLEN_VALUE], 
+           char binname[4][FLEN_VALUE], 
+           double weightin,        
+           char wtcol[FLEN_VALUE], 
+           int recip,              
+           char *selectrow,        
+           int *status);
 int CFITS_API fits_select_image_section(fitsfile **fptr, char *outfile,
            char *imagesection, int *status);
 int CFITS_API fits_copy_image_section(fitsfile *infptr, fitsfile *outfile,
