@@ -12,9 +12,12 @@
 #include <stddef.h>  /* apparently needed to define size_t */
 #include "fitsio2.h"
 #include "group.h"
+#ifdef CFITSIO_HAVE_CURL
+  #include <curl/curl.h>
+#endif
 
 #define MAX_PREFIX_LEN 20  /* max length of file type prefix (e.g. 'http://') */
-#define MAX_DRIVERS 24     /* max number of file I/O drivers */
+#define MAX_DRIVERS 27     /* max number of file I/O drivers */
 
 typedef struct    /* structure containing pointers to I/O driver functions */ 
 {   char prefix[MAX_PREFIX_LEN];
@@ -324,26 +327,26 @@ int ffomem(fitsfile **fptr,      /* O - FITS file pointer                   */
         ffpmsg("ffomem could not move to the specified extension:");
         if (extnum > 0)
         {
-          sprintf(errmsg,
+          snprintf(errmsg, FLEN_ERRMSG,
           " extension number %d doesn't exist or couldn't be opened.",extnum);
           ffpmsg(errmsg);
         }
         else
         {
-          sprintf(errmsg,
+          snprintf(errmsg, FLEN_ERRMSG,
           " extension with EXTNAME = %s,", extname);
           ffpmsg(errmsg);
 
           if (extvers)
           {
-             sprintf(errmsg,
+             snprintf(errmsg, FLEN_ERRMSG,
              "           and with EXTVERS = %d,", extvers);
              ffpmsg(errmsg);
           }
 
           if (movetotype != ANY_HDU)
           {
-             sprintf(errmsg,
+             snprintf(errmsg, FLEN_ERRMSG,
              "           and with XTENSION = %s,", hdtype[movetotype]);
              ffpmsg(errmsg);
           }
@@ -413,6 +416,7 @@ int ffeopn(fitsfile **fptr,      /* O - FITS file pointer                   */
 {
     int hdunum, naxis, thdutype, gotext=0;
     char *ext, *textlist;
+    char *saveptr;
   
     if (*status > 0)
         return(*status);
@@ -434,8 +438,8 @@ int ffeopn(fitsfile **fptr,      /* O - FITS file pointer                   */
 	}
 
         strcpy(textlist, extlist);
-        for(ext=(char *)strtok(textlist, " "); ext != NULL; 
-	    ext=(char *)strtok(NULL," ")){
+        for(ext=(char *)ffstrtok(textlist, " ",&saveptr); ext != NULL; 
+	    ext=(char *)ffstrtok(NULL," ",&saveptr)){
 	    fits_movnam_hdu(*fptr, ANY_HDU, ext, 0, status);
 	    if( *status == 0 ){
 	      gotext = 1;
@@ -948,26 +952,26 @@ move2hdu:
         ffpmsg("ffopen could not move to the specified extension:");
         if (extnum > 0)
         {
-          sprintf(errmsg,
+          snprintf(errmsg, FLEN_ERRMSG,
           " extension number %d doesn't exist or couldn't be opened.",extnum);
           ffpmsg(errmsg);
         }
         else
         {
-          sprintf(errmsg,
+          snprintf(errmsg, FLEN_ERRMSG,
           " extension with EXTNAME = %s,", extname);
           ffpmsg(errmsg);
 
           if (extvers)
           {
-             sprintf(errmsg,
+             snprintf(errmsg, FLEN_ERRMSG,
              "           and with EXTVERS = %d,", extvers);
              ffpmsg(errmsg);
           }
 
           if (movetotype != ANY_HDU)
           {
-             sprintf(errmsg,
+             snprintf(errmsg, FLEN_ERRMSG,
              "           and with XTENSION = %s,", hdtype[movetotype]);
              ffpmsg(errmsg);
           }
@@ -1046,7 +1050,7 @@ move2hdu:
                fits_read_key(*fptr, TSTRING, "EXTNAME", tblname, NULL,&tstatus);
 
                if ( (!strstr(tblname, "GTI") && !strstr(tblname, "gti")) &&
-                    strncasecmp(tblname, "OBSTABLE", 8) )
+                    fits_strncasecmp(tblname, "OBSTABLE", 8) )
                   break;  /* found an interesting table */
             }
           }  /* end while */
@@ -1131,16 +1135,8 @@ move2hdu:
 
        writecopy = 1;  /* we are now dealing with a copy of the original file */
 
-       /* add some HISTORY; fits_copy_image_cell also wrote HISTORY keywords */
        
-/*  disable this; leave it up to calling routine to write any HISTORY keywords
-       if (*extname)
-        sprintf(card,"HISTORY  in HDU '%.16s' of file '%.36s'",extname,infile);
-       else
-        sprintf(card,"HISTORY  in HDU %d of file '%.45s'", extnum, infile);
-
-       ffprec(*fptr, card, status);
-*/
+       /*  leave it up to calling routine to write any HISTORY keywords */
     }
 
     /* --------------------------------------------------------------------- */
@@ -1510,7 +1506,7 @@ int fits_already_open(fitsfile **fptr, /* I/O - FITS file pointer       */
     if (mode == 0)
         return(*status);
 
-    if(strcasecmp(urltype,"FILE://") == 0)
+    if(fits_strcasecmp(urltype,"FILE://") == 0)
       {
         fits_path2url(infile,tmpinfile,status);
 
@@ -1548,7 +1544,7 @@ int fits_already_open(fitsfile **fptr, /* I/O - FITS file pointer       */
             return(*status);
           }
 
-          if(strcasecmp(oldurltype,"FILE://") == 0)
+          if(fits_strcasecmp(oldurltype,"FILE://") == 0)
             {
               fits_path2url(oldinfile,tmpStr,status);
               
@@ -2529,7 +2525,7 @@ int fits_copy_cell2image(
 			    colnum, 0, 0, status);
 
     /* add some HISTORY  */
-    sprintf(card,"HISTORY  This image was copied from row %ld of column '%s',",
+    snprintf(card,FLEN_CARD,"HISTORY  This image was copied from row %ld of column '%s',",
             rownum, colname);
 /* disable this; leave it up to the caller to write history if needed.    
     ffprec(newptr, card, status);
@@ -2735,7 +2731,7 @@ int fits_copy_image2cell(
     if (*status) {
 
       *status = 0;
-      sprintf(tform, "%.0f%c", (double) repeat, tformchar);
+      snprintf(tform, 20, "%.0f%c", (double) repeat, tformchar);
       ffgncl(newptr, &ncols, status);
       colnum = ncols+1;
       fficol(newptr, colnum, colname, tform, status);
@@ -2798,7 +2794,7 @@ int fits_copy_image2cell(
     ffghadll(fptr, &headstart, &datastart, &dataend, status);
     imgstart = datastart;
 
-    sprintf(card, "HISTORY  Table column '%s' row %ld copied from image",
+    snprintf(card, FLEN_CARD, "HISTORY  Table column '%s' row %ld copied from image",
 	    colname, rownum);
 /*
   Don't automatically write History keywords; leave this up to the caller. 
@@ -2811,7 +2807,7 @@ int fits_copy_image2cell(
     strcpy(filename, "HISTORY   ");
     ffflnm(fptr, filename+strlen(filename), status);
     ffghdn(fptr, &hdunum);
-    sprintf(filename+strlen(filename),"[%d]", hdunum-1);
+    snprintf(filename+strlen(filename),FLEN_FILENAME+20-strlen(filename),"[%d]", hdunum-1);
 /*
     ffprec(newptr, filename, status);
 */
@@ -4774,6 +4770,95 @@ int fits_init_cfitsio(void)
         return(status);
     }
 
+#ifdef HAVE_NET_SERVICES
+
+    /* 25--------------------https  driver-----------------------*/
+    status = fits_register_driver("https://",
+            NULL,
+            mem_shutdown,
+            mem_setoptions,
+            mem_getoptions, 
+            mem_getversion,
+            https_checkfile,
+            https_open,
+            NULL,            /* create function not required */
+            mem_truncate,
+            mem_close_free,
+            NULL,            /* remove function not required */
+            mem_size,
+            NULL,            /* flush function not required */
+            mem_seek,
+            mem_read,
+            mem_write);
+
+    if (status)
+    {
+        ffpmsg("failed to register the https:// driver (init_cfitsio)");
+        FFUNLOCK;
+        return(status);
+    }
+
+    /* 26--------------------https file driver-----------------------*/
+
+    status = fits_register_driver("httpsfile://",
+            NULL,
+            file_shutdown,
+            file_setoptions,
+            file_getoptions, 
+            file_getversion,
+            NULL,            /* checkfile not needed */ 
+            https_file_open,
+            file_create,
+#ifdef HAVE_FTRUNCATE
+            file_truncate,
+#else
+            NULL,   /* no file truncate function */
+#endif
+            file_close,
+            file_remove,
+            file_size,
+            file_flush,
+            file_seek,
+            file_read,
+            file_write);
+
+    if (status)
+    {
+        ffpmsg("failed to register the httpsfile:// driver (init_cfitsio)");
+        FFUNLOCK;
+        return(status);
+    }
+
+    /* 27--------------------https memory driver-----------------------*/
+    /*  same as https:// driver, except memory file can be opened READWRITE */
+    status = fits_register_driver("httpsmem://",
+            NULL,
+            mem_shutdown,
+            mem_setoptions,
+            mem_getoptions, 
+            mem_getversion,
+            https_checkfile,
+            https_file_open,  /* this will simply call https_open */
+            NULL,            /* create function not required */
+            mem_truncate,
+            mem_close_free,
+            NULL,            /* remove function not required */
+            mem_size,
+            NULL,            /* flush function not required */
+            mem_seek,
+            mem_read,
+            mem_write);
+
+    if (status)
+    {
+        ffpmsg("failed to register the httpsmem:// driver (init_cfitsio)");
+        FFUNLOCK;
+        return(status);
+    }
+      /* === End of https net drivers section === */  
+#endif
+
+
     /* reset flag.  Any other threads will now not need to call this routine */
     need_to_initialize = 0;
 
@@ -4961,7 +5046,7 @@ int ffifile2(char *url,       /* input filename */
             strcat(urltype, "stdin://");
         ptr1++;
     }
-    else if (!strncasecmp(ptr1, "stdin", 5))
+    else if (!fits_strncasecmp(ptr1, "stdin", 5))
     {
         if (urltype)
             strcat(urltype, "stdin://");
@@ -5472,21 +5557,21 @@ int ffifile2(char *url,       /* input filename */
            if (*tmptr == '@')  /* test for leading @ symbol */
                hasAt = 1;
 
-           if ( !strncasecmp(tmptr, "col ", 4) )
+           if ( !fits_strncasecmp(tmptr, "col ", 4) )
               colStart = 1;
 
-           if ( !strncasecmp(tmptr, "bin", 3) )
+           if ( !fits_strncasecmp(tmptr, "bin", 3) )
               binStart = 1;
 
-           if ( !strncasecmp(tmptr, "pix", 3) )
+           if ( !fits_strncasecmp(tmptr, "pix", 3) )
               pixStart = 1;
 
-           if ( !strncasecmp(tmptr, "compress ", 9) ||
-                !strncasecmp(tmptr, "compress]", 9) )
+           if ( !fits_strncasecmp(tmptr, "compress ", 9) ||
+                !fits_strncasecmp(tmptr, "compress]", 9) )
               compStart = 1;
 
-           if ( !strncasecmp(tmptr, "gtifilter(", 10) ||
-                !strncasecmp(tmptr, "regfilter(", 10) )
+           if ( !fits_strncasecmp(tmptr, "gtifilter(", 10) ||
+                !fits_strncasecmp(tmptr, "regfilter(", 10) )
            {
                rowFilter = 1;
            }
@@ -6654,7 +6739,7 @@ int ffimport_file( char *filename,   /* Text file to read                   */
    lines[0] = '\0';
 
    if( (aFile = fopen( filename, "r" ))==NULL ) {
-      sprintf(line,"Could not open ASCII file %s.",filename);
+      snprintf(line,256,"Could not open ASCII file %s.",filename);
       ffpmsg(line);
       free( lines );
       return(*status = FILE_NOT_OPENED);
@@ -7331,3 +7416,40 @@ int pixel_filter_helper(
 
     return(*status);
 }
+
+/*-------------------------------------------------------------------*/
+int ffihtps()
+{
+   /* Wrapper function for global initialization of curl library.
+      This is NOT THREAD-SAFE */
+   int status=0;
+#ifdef CFITSIO_HAVE_CURL
+   if (curl_global_init(CURL_GLOBAL_ALL))
+      /* Do we want to define a new CFITSIO error code for this? */
+      status = -1;
+#endif
+   return status;
+}
+
+/*-------------------------------------------------------------------*/
+int ffchtps()
+{
+   /* Wrapper function for global cleanup of curl library.
+      This is NOT THREAD-SAFE */
+#ifdef CFITSIO_HAVE_CURL
+   curl_global_cleanup();
+#endif
+   return 0;
+}
+
+/*-------------------------------------------------------------------*/
+void ffvhtps(int flag)
+{
+   /* Turn libcurl's verbose output on (1) or off (0). 
+      This is NOT THREAD-SAFE */
+#ifdef HAVE_NET_SERVICES
+
+   https_set_verbose(flag);
+#endif
+}
+

@@ -26,10 +26,12 @@ extern int Fitsio_Pthread_Status;
 #define FFUNLOCK1(lockname) (Fitsio_Pthread_Status = pthread_mutex_unlock(&lockname))
 #define FFLOCK   FFLOCK1(Fitsio_Lock)
 #define FFUNLOCK FFUNLOCK1(Fitsio_Lock)
+#define ffstrtok(str, tok, save) strtok_r(str, tok, save)
 
 #else
 #define FFLOCK
 #define FFUNLOCK
+#define ffstrtok(str, tok, save) strtok(str, tok)
 #endif
 
 /*
@@ -391,7 +393,6 @@ int ffwritehisto(long totaln, long offset, long firstn, long nvalues,
              int narrays, iteratorCol *imagepars, void *userPointer);
 int ffcalchist(long totalrows, long offset, long firstrow, long nrows,
              int ncols, iteratorCol *colpars, void *userPointer);
-int ffrhdu(fitsfile *fptr, int *hdutype, int *status);
 int ffpinit(fitsfile *fptr, int *status);
 int ffainit(fitsfile *fptr, int *status);
 int ffbinit(fitsfile *fptr, int *status);
@@ -1153,6 +1154,12 @@ int http_open(char *filename, int rwmode, int *driverhandle);
 int http_file_open(char *filename, int rwmode, int *driverhandle);
 int http_compress_open(char *filename, int rwmode, int *driverhandle);
 
+/* https driver I/O routines */
+int https_checkfile(char* urltype, char *infile, char *outfile);
+int https_open(char *filename, int rwmode, int *driverhandle);
+int https_file_open(char *filename, int rwmode, int *driverhandle);
+void https_set_verbose(int flag);
+
 /* ftp driver I/O routines */
 
 int ftp_checkfile(char *urltype, char *infile, char *outfile);
@@ -1206,11 +1213,10 @@ int compress2file_from_mem(
 #include "drvrsmem.h"
 #endif
 
-#if defined(vms) || defined(__vms) || defined(WIN32) || defined(__WIN32__) || (defined(macintosh) && !defined(TARGET_API_MAC_CARBON))
 /* A hack for nonunix machines, which lack strcasecmp and strncasecmp */
-int strcasecmp (const char *s1, const char *s2       );
-int strncasecmp(const char *s1, const char *s2, size_t n);
-#endif
+/* these functions are in fitscore.c */
+int fits_strcasecmp (const char *s1, const char *s2       );
+int fits_strncasecmp(const char *s1, const char *s2, size_t n);
 
 /* end of the entire "ifndef _FITSIO2_H" block */
 #endif
