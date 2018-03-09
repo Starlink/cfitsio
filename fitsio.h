@@ -34,8 +34,8 @@ SERVICES PROVIDED HEREUNDER."
 #ifndef _FITSIO_H
 #define _FITSIO_H
 
-#define CFITSIO_VERSION 3.39
-#define CFITSIO_MINOR 39
+#define CFITSIO_VERSION 3.43
+#define CFITSIO_MINOR 43
 #define CFITSIO_MAJOR 3
 #define CFITSIO_SONAME 5
 
@@ -90,7 +90,7 @@ SERVICES PROVIDED HEREUNDER."
     || (defined(__MINGW32__) && defined(_OFF_T_DEFINED)) \
     || defined(_MIPS_SZLONG) || defined(__APPLE__) || defined(_AIX)
 #    define OFF_T off_t
-#elif defined(__BORLANDC__) || (_MSC_VER) && (_MSC_VER>= 1400)
+#elif defined(__BORLANDC__) || (defined(_MSC_VER) && (_MSC_VER>= 1400))
 #    define OFF_T long long
 #else
 #    define OFF_T long
@@ -1139,6 +1139,7 @@ int CFITS_API ffcdfl(fitsfile *fptr, int *status);
 int CFITS_API ffwrhdu(fitsfile *fptr, FILE *outstream, int *status);
 
 int CFITS_API ffrdef(fitsfile *fptr, int *status);
+int CFITS_API ffrhdu(fitsfile *fptr, int *hdutype, int *status);
 int CFITS_API ffhdef(fitsfile *fptr, int morekeys, int *status);
 int CFITS_API ffpthp(fitsfile *fptr, long theap, int *status);
  
@@ -1988,6 +1989,11 @@ int CFITS_API fits_hdecompress64(unsigned char *input, int smooth, LONGLONG *a, 
 
 int CFITS_API fits_compress_table  (fitsfile *infptr, fitsfile *outfptr, int *status);
 int CFITS_API fits_uncompress_table(fitsfile *infptr, fitsfile *outfptr, int *status);
+
+/* curl library wrapper routines (for https access) */
+int CFITS_API fits_init_https();
+int CFITS_API fits_cleanup_https();
+void CFITS_API fits_verbose_https(int flag);
 
 /*  The following exclusion if __CINT__ is defined is needed for ROOT */
 #ifndef __CINT__

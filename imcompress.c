@@ -639,17 +639,17 @@ int fits_set_compression_pref(
                 /* allowed values: RICE_1, GZIP_1, GZIP_2, PLIO_1,     */
                 /*  HCOMPRESS_1, BZIP2_1, and NOCOMPRESS               */
 
-                if        (!strncasecmp(value, "'RICE_1", 7) ) {
+                if        (!fits_strncasecmp(value, "'RICE_1", 7) ) {
 		    comptype = RICE_1;
-                } else if (!strncasecmp(value, "'GZIP_1", 7) ) {
+                } else if (!fits_strncasecmp(value, "'GZIP_1", 7) ) {
 		    comptype = GZIP_1;
-                } else if (!strncasecmp(value, "'GZIP_2", 7) ) {
+                } else if (!fits_strncasecmp(value, "'GZIP_2", 7) ) {
 		    comptype = GZIP_2;
-                } else if (!strncasecmp(value, "'PLIO_1", 7) ) {
+                } else if (!fits_strncasecmp(value, "'PLIO_1", 7) ) {
 		    comptype = PLIO_1;
-                } else if (!strncasecmp(value, "'HCOMPRESS_1", 12) ) {
+                } else if (!fits_strncasecmp(value, "'HCOMPRESS_1", 12) ) {
 		    comptype = HCOMPRESS_1;
-                } else if (!strncasecmp(value, "'NONE", 5) ) {
+                } else if (!fits_strncasecmp(value, "'NONE", 5) ) {
 		    comptype = NOCOMPRESS;
 		} else {
 			ffpmsg("Unknown FZALGOR keyword compression algorithm:");
@@ -661,9 +661,9 @@ int fits_set_compression_pref(
 
 	    } else if (!strncmp(card+2, "TILE  ", 6) ) {
 
-                if (!strncasecmp(value, "'row", 4) ) {
+                if (!fits_strncasecmp(value, "'row", 4) ) {
                    tiledim[0] = -1;
-		} else if (!strncasecmp(value, "'whole", 6) ) {
+		} else if (!fits_strncasecmp(value, "'whole", 6) ) {
                    tiledim[0] = -1;
                    tiledim[1] = -1;
                    tiledim[2] = -1;
@@ -682,11 +682,11 @@ int fits_set_compression_pref(
 
 	    } else if (!strncmp(card+2, "QMETHD", 6) ) {
 
-                    if (!strncasecmp(value, "'no_dither", 10) ) {
+                    if (!fits_strncasecmp(value, "'no_dither", 10) ) {
                         ivalue = -1; /* just quantize, with no dithering */
-		    } else if (!strncasecmp(value, "'subtractive_dither_1", 21) ) {
+		    } else if (!fits_strncasecmp(value, "'subtractive_dither_1", 21) ) {
                         ivalue = SUBTRACTIVE_DITHER_1; /* use subtractive dithering */
-		    } else if (!strncasecmp(value, "'subtractive_dither_2", 21) ) {
+		    } else if (!fits_strncasecmp(value, "'subtractive_dither_2", 21) ) {
                         ivalue = SUBTRACTIVE_DITHER_2; /* dither, except preserve zero-valued pixels */
 		    } else {
 		        ffpmsg("Unknown value for FZQUANT keyword: (set_compression_pref)");
@@ -698,9 +698,9 @@ int fits_set_compression_pref(
 		    
 	    } else if (!strncmp(card+2, "DTHRSD", 6) ) {
 
-                if (!strncasecmp(value, "'checksum", 9) ) {
+                if (!fits_strncasecmp(value, "'checksum", 9) ) {
                     ivalue = -1; /* use checksum of first tile */
-		} else if (!strncasecmp(value, "'clock", 6) ) {
+		} else if (!fits_strncasecmp(value, "'clock", 6) ) {
                     ivalue = 0; /* set dithering seed based on system clock */
 		} else {  /* read integer value */
 		    if (*value == '\'')
@@ -721,9 +721,9 @@ int fits_set_compression_pref(
 	    } else if (!strncmp(card+2, "I2F", 3) ) {
 
 	        /* set whether to convert integers to float then use lossy compression */
-                if (!strcasecmp(value, "t") ) {
+                if (!fits_strcasecmp(value, "t") ) {
 		    fits_set_lossy_int (outfptr, 1, status);
-		} else if (!strcasecmp(value, "f") ) {
+		} else if (!fits_strcasecmp(value, "f") ) {
 		    fits_set_lossy_int (outfptr, 0, status);
 		} else {
 		        ffpmsg("Unknown value for FZI2F keyword: (set_compression_pref)");
@@ -968,13 +968,14 @@ int imcomp_init_table(fitsfile *outfptr,
     char *tunit[] = {"\0",            "\0",            "\0"  };
     char comm[FLEN_COMMENT];
     long actual_tilesize[MAX_COMPRESS_DIM]; /* Actual size to use for tiles */
+    int is_primary=0; /* Is this attempting to write to the primary? */
     
     if (*status > 0)
         return(*status);
 
     /* check for special case of losslessly compressing floating point */
     /* images.  Only compression algorithm that supports this is GZIP */
-    if ( (outfptr->Fptr)->request_quantize_level == NO_QUANTIZE) {
+    if ( (inbitpix < 0) && ((outfptr->Fptr)->request_quantize_level == NO_QUANTIZE) ) {
        if (((outfptr->Fptr)->request_compress_type != GZIP_1) &&
            ((outfptr->Fptr)->request_compress_type != GZIP_2)) {
          ffpmsg("Lossless compression of floating point images must use GZIP (imcomp_init_table)");
@@ -1206,6 +1207,10 @@ int imcomp_init_table(fitsfile *outfptr,
         return(*status = DATA_COMPRESSION_ERR);
     }
 
+    /* If attempting to write compressed image to primary, the
+       call to ffcrtb will increment Fptr->curhdu to 1.  Therefore
+       we need to test now for setting is_primary */
+    is_primary = (outfptr->Fptr->curhdu == 0);
     /* create the bintable extension to contain the compressed image */
     ffcrtb(outfptr, BINARY_TBL, nrows, ncols, ttype, 
                 tform, tunit, 0, status);
@@ -1218,8 +1223,9 @@ int imcomp_init_table(fitsfile *outfptr,
         /*  write the keywords defining the datatype and dimensions of */
 	/*  the uncompressed image.  If not, these keywords will be */
         /*  copied later from the input uncompressed image  */
-	   
-        ffpkyl (outfptr, "ZSIMPLE", 1,
+	
+        if (is_primary)   
+            ffpkyl (outfptr, "ZSIMPLE", 1,
 			"file does conform to FITS standard", status);
         ffpkyj (outfptr, "ZBITPIX", bitpix,
 			"data type of original image", status);
@@ -1228,7 +1234,7 @@ int imcomp_init_table(fitsfile *outfptr,
 
         for (ii = 0;  ii < naxis;  ii++)
         {
-            sprintf (keyname, "ZNAXIS%d", ii+1);
+            snprintf (keyname, FLEN_KEYWORD,"ZNAXIS%d", ii+1);
             ffpkyj (outfptr, keyname, naxes[ii],
 			"length of original image axis", status);
         }
@@ -1236,7 +1242,7 @@ int imcomp_init_table(fitsfile *outfptr,
                       
     for (ii = 0;  ii < naxis;  ii++)
     {
-        sprintf (keyname, "ZTILE%d", ii+1);
+        snprintf (keyname, FLEN_KEYWORD,"ZTILE%d", ii+1);
         ffpkyj (outfptr, keyname, actual_tilesize[ii],
 			"size of tiles to be compressed", status);
     }
@@ -1725,8 +1731,16 @@ int imcomp_compress_tile (fitsfile *outfptr,
     if ( (outfptr->Fptr)->quantize_level == NO_QUANTIZE) {
        if (((outfptr->Fptr)->compress_type != GZIP_1) &&
            ((outfptr->Fptr)->compress_type != GZIP_2)) {
-         ffpmsg("Lossless compression of floating point images must use GZIP (imcomp_compress_tile)");
-         return(*status = DATA_COMPRESSION_ERR);
+           switch (datatype) {
+            case TFLOAT:
+            case TDOUBLE:
+            case TCOMPLEX:
+            case TDBLCOMPLEX:
+              ffpmsg("Lossless compression of floating point images must use GZIP (imcomp_compress_tile)");
+              return(*status = DATA_COMPRESSION_ERR);
+            default:
+              break;
+          }
        }
     }
 
@@ -5194,6 +5208,7 @@ int imcomp_get_compressed_image_par(fitsfile *infptr, int *status)
     if (ffgky(infptr, TSTRING, "ZQUANTIZ", value, NULL, &tstatus) > 0)
     {
         (infptr->Fptr)->quantize_method = 0;
+        (infptr->Fptr)->quantize_level = 0;
     } else {
 
         if (!FSTRCMP(value, "NONE") ) {
@@ -5249,7 +5264,7 @@ int imcomp_get_compressed_image_par(fitsfile *infptr, int *status)
     for (ii = 0;  ii < (infptr->Fptr)->zndim;  ii++)
     {
         /* get image size */
-        sprintf (keyword, "ZNAXIS%d", ii+1);
+        snprintf (keyword, FLEN_KEYWORD,"ZNAXIS%d", ii+1);
 	ffgky (infptr, TLONG,keyword, &(infptr->Fptr)->znaxis[ii],NULL,status);
 
         if (*status > 0)
@@ -5259,7 +5274,7 @@ int imcomp_get_compressed_image_par(fitsfile *infptr, int *status)
         }
 
         /* get compression tile size */
-	sprintf (keyword, "ZTILE%d", ii+1);
+	snprintf (keyword, FLEN_KEYWORD,"ZTILE%d", ii+1);
 
         /* set default tile size in case keywords are not present */
         if (ii == 0)
@@ -5559,11 +5574,11 @@ int imcomp_copy_img2comp(fitsfile *infptr, fitsfile *outfptr, int *status)
 
 	/* write some associated HISTORY keywords */
         fits_parse_value(card, card2, NULL, status);
-	if (strncasecmp(card2, "'NONE", 5) ) {
+	if (fits_strncasecmp(card2, "'NONE", 5) ) {
 	    /* the value is not 'NONE' */	
 	    fits_write_history(outfptr, 
 	        "Image was compressed by CFITSIO using scaled integer quantization:", status);
-	    sprintf(card2, "  q = %f / quantized level scaling parameter", 
+	    snprintf(card2, FLEN_CARD,"  q = %f / quantized level scaling parameter", 
 	        (outfptr->Fptr)->request_quantize_level);
 	    fits_write_history(outfptr, card2, status); 
 	    fits_write_history(outfptr, card+10, status); 
@@ -6315,9 +6330,10 @@ int imcomp_decompress_tile (fitsfile *infptr,
 	       all we need to is to reset the error status to zero.
 	    */
 	       
-            if ((infptr->Fptr)->compress_type == HCOMPRESS_1) {
-	        if (*status == NUM_OVERFLOW) *status = 0;
-	    }
+             if ((infptr->Fptr)->compress_type == HCOMPRESS_1) {
+                if ((*status == NUM_OVERFLOW) || (*status == OVERFLOW_ERR))
+                        *status = 0;
+             }
           }
         } else if (tiledatatype == TSHORT) {
           fffi2i2((short *)idata, tilelen, bscale, bzero, nullcheck, (short) tnull,
@@ -7953,13 +7969,13 @@ int fits_compress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
     tstatus = 0;
     if (!fits_read_key(infptr, TSTRING, "FZALGOR", tempstring, NULL, &tstatus)) {
 
-	    if (!strcasecmp(tempstring, "NONE")) {
+	    if (!fits_strcasecmp(tempstring, "NONE")) {
 	            default_algor = NOCOMPRESS;
-	    } else if (!strcasecmp(tempstring, "GZIP") || !strcasecmp(tempstring, "GZIP_1")) {
+	    } else if (!fits_strcasecmp(tempstring, "GZIP") || !fits_strcasecmp(tempstring, "GZIP_1")) {
 	            default_algor = GZIP_1;
-	    } else if (!strcasecmp(tempstring, "GZIP_2")) {
+	    } else if (!fits_strcasecmp(tempstring, "GZIP_2")) {
 	            default_algor = GZIP_2;
- 	    } else if (!strcasecmp(tempstring, "RICE_1")) {
+ 	    } else if (!fits_strcasecmp(tempstring, "RICE_1")) {
 	            default_algor = RICE_1;
  	    } else {
  	        ffpmsg("FZALGOR specifies unsupported table compression algorithm:");
@@ -8080,11 +8096,11 @@ int fits_compress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
 	tstatus = 0;
 	if (!fits_read_key(outfptr, TSTRING, keyname, tempstring, NULL, &tstatus)) {
 
-	    if (!strcasecmp(tempstring, "GZIP") || !strcasecmp(tempstring, "GZIP_1")) {
+	    if (!fits_strcasecmp(tempstring, "GZIP") || !fits_strcasecmp(tempstring, "GZIP_1")) {
 	            compalgor[ii] = GZIP_1;
-	    } else if (!strcasecmp(tempstring, "GZIP_2")) {
+	    } else if (!fits_strcasecmp(tempstring, "GZIP_2")) {
 	            compalgor[ii] = GZIP_2;
-	    } else if (!strcasecmp(tempstring, "RICE_1")) {
+	    } else if (!fits_strcasecmp(tempstring, "RICE_1")) {
 	            compalgor[ii] = RICE_1;
 	    } else {
 	        ffpmsg("Unsupported table compression algorithm specification.");
@@ -8217,7 +8233,7 @@ int fits_compress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
     
         for (ii = 0; ii < ncols; ii++) {  /* loop over columns */
 	  /* initialize the diagnostic compression results string */
-	  sprintf(results[ii],"%3d %3d %3d ", ii+1, coltype[ii], compalgor[ii]);  
+	  snprintf(results[ii],30,"%3d %3d %3d ", ii+1, coltype[ii], compalgor[ii]);  
           cratio[ii] = 0;
 	  
           if (rm_repeat[ii] > 0) {  /* skip virtual columns with zero width */
@@ -8380,7 +8396,7 @@ int fits_compress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
 		if (compressed_size != 0)
 		    cratio[ii] = uncompressed_size / compressed_size;
 
-		sprintf(tempstring," r=%6.2f",cratio[ii]);
+		snprintf(tempstring,FLEN_VALUE," r=%6.2f",cratio[ii]);
 		strcat(results[ii],tempstring);
 
 		/* now we just have to compress the array of descriptors (both input and output) */
@@ -8507,7 +8523,7 @@ int fits_compress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
 	    if (dlen != 0)
 	       cratio[ii] = (float) datasize / (float) dlen;  /* compression ratio of the column */
 
-	    sprintf(tempstring," r=%6.2f",cratio[ii]);
+	    snprintf(tempstring,FLEN_VALUE," r=%6.2f",cratio[ii]);
 	    strcat(results[ii],tempstring);
  
           }  /* end of not a virtual column */
@@ -8616,6 +8632,9 @@ int fits_uncompress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
         *status = DATA_DECOMPRESSION_ERR;
         return(*status);
     }
+
+    /* silently ignore illegal ZTILELEN value if too large */
+    if (rowspertile > naxis2) rowspertile = naxis2;
 
     fits_read_key(infptr, TLONG, "ZPCOUNT", &pcount, comm, status);
     if (*status > 0) {
