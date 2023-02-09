@@ -34,10 +34,13 @@ SERVICES PROVIDED HEREUNDER."
 #ifndef _FITSIO_H
 #define _FITSIO_H
 
-#define CFITSIO_VERSION 3.48
-#define CFITSIO_MINOR 48
-#define CFITSIO_MAJOR 3
-#define CFITSIO_SONAME 9
+#define CFITSIO_VERSION 4.2.0
+/* Minor and micro numbers must not exceed 99 under current method
+   of version representataion in ffvers(). */
+#define CFITSIO_MICRO 0
+#define CFITSIO_MINOR 2
+#define CFITSIO_MAJOR 4
+#define CFITSIO_SONAME 10
 
 /* the SONAME is incremented in a new release if the binary shared */
 /* library (on linux and Mac systems) is not backward compatible */
@@ -480,6 +483,7 @@ typedef struct  /* structure for the iterator function column information */
 #define InputCol         0  /* flag for input only iterator column       */
 #define InputOutputCol   1  /* flag for input and output iterator column */
 #define OutputCol        2  /* flag for output only iterator column      */
+#define TemporaryCol     3  /* flag for temporary iterator column INTERNAL */
 
 /*=============================================================================
 *
@@ -1437,6 +1441,8 @@ int CFITS_API ffggpd(fitsfile *fptr, long group, long firstelem, long nelem,
 int CFITS_API ffgcv( fitsfile *fptr, int datatype, int colnum, LONGLONG firstrow,
            LONGLONG firstelem, LONGLONG nelem, void *nulval, void *array, int *anynul,
            int  *status);
+int CFITS_API ffgcvn (fitsfile *fptr, int ncols, int *datatype, int *colnum, LONGLONG firstrow,
+	    LONGLONG nrows, void **nulval, void **array, int *anynul, int *status);
 int CFITS_API ffgcf( fitsfile *fptr, int datatype, int colnum, LONGLONG firstrow,
            LONGLONG firstelem, LONGLONG nelem, void *array, char *nullarray,
            int *anynul, int *status);
@@ -1746,6 +1752,8 @@ int CFITS_API ffiter(int ncols,  iteratorCol *data, long offset, long nPerLoop,
 /*--------------------- write column elements -------------*/
 int CFITS_API ffpcl(fitsfile *fptr, int datatype, int colnum, LONGLONG firstrow,
           LONGLONG firstelem, LONGLONG nelem, void *array, int *status);
+int CFITS_API ffpcln(fitsfile *fptr, int ncols, int *datatype, int *colnum, LONGLONG firstrow,
+	   LONGLONG nrows, void **array, void **nulval, int *status);
 int CFITS_API ffpcls(fitsfile *fptr, int colnum, LONGLONG firstrow, LONGLONG firstelem,
            LONGLONG nelem, char **array, int *status);
 int CFITS_API ffpcll(fitsfile *fptr, int colnum, LONGLONG firstrow, LONGLONG firstelem,
@@ -1838,6 +1846,8 @@ int CFITS_API ffccls(fitsfile *infptr, fitsfile *outfptr, int incol, int outcol,
 	   int ncols, int create_col, int *status);
 int CFITS_API ffcprw(fitsfile *infptr, fitsfile *outfptr, LONGLONG firstrow, 
            LONGLONG nrows, int *status);
+int CFITS_API ffcpsr(fitsfile *infptr, fitsfile *outfptr, LONGLONG firstrow, 
+	   LONGLONG nrows, char *row_status, int *status);
 int CFITS_API ffcpht(fitsfile *infptr, fitsfile *outfptr, LONGLONG firstrow, 
            LONGLONG nrows, int *status);
 
