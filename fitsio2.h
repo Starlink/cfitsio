@@ -1019,7 +1019,10 @@ void ieevpr(float *inarray, float *outarray, long *nvals);
 void ieevur(float *inarray, float *outarray, long *nvals);
 
 /*  routines related to the lexical parser  */
+#ifndef STAR_TYPEDEF_PARSEDATA
+#define STAR_TYPEDEF_PARSEDATA
 typedef struct ParseData_struct ParseData;
+#endif
 int  ffselect_table(fitsfile **fptr, char *outfile, char *expr,  int *status);
 int  ffiprs( fitsfile *fptr, int compressed, char *expr, int maxdim,
 	     int *datatype, long *nelem, int *naxis, long *naxes,
