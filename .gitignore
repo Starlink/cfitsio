@@ -13,9 +13,16 @@ cfitsio.pc
 config.log
 config.status
 configure.lineno
-fitscopy
-imcopy
-listhead
+/cookbook
+/fitscopy
+/fitsverify
+/fpack
+/funpack
+/imcopy
+/listhead
+/smem
+/speed
+/testprog
 
 # Mac
 ._*
