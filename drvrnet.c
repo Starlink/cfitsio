@@ -867,10 +867,10 @@ static int http_open_network(char *url, FILE **httpfile, char *contentencoding,
     strcat(tmpstr,tmpstr1);
   }
 
-/*  snprintf(tmpstr1,SHORTLEN,"User-Agent: HEASARC/CFITSIO/%-8.3f\r\n",ffvers(&version)); */
+/*  snprintf(tmpstr1,SHORTLEN,"User-Agent: HEASARC/CFITSIO/%-8.4f\r\n",ffvers(&version)); */
 
-/*  snprintf(tmpstr1,SHORTLEN,"User-Agent: CFITSIO/HEASARC/%-8.3f\r\n",ffvers(&version)); */
-  snprintf(tmpstr1,SHORTLEN,"User-Agent: FITSIO/HEASARC/%-8.3f\r\n",ffvers(&version)); 
+/*  snprintf(tmpstr1,SHORTLEN,"User-Agent: CFITSIO/HEASARC/%-8.4f\r\n",ffvers(&version)); */
+  snprintf(tmpstr1,SHORTLEN,"User-Agent: FITSIO/HEASARC/%-8.4f\r\n",ffvers(&version)); 
  
   if (strlen(tmpstr) + strlen(tmpstr1) > MAXLEN - 1)
   {
@@ -1841,7 +1841,7 @@ int ftps_open_network(char *filename, curlmembuf* buffer)
      username = "anonymous";
   if (!password || strlen(password)==0)
   {
-     snprintf(agentStr,SHORTLEN,"User-Agent: FITSIO/HEASARC/%-8.3f",ffvers(&version));
+     snprintf(agentStr,SHORTLEN,"User-Agent: FITSIO/HEASARC/%-8.4f",ffvers(&version));
      password = agentStr;
   }
   
@@ -1928,7 +1928,7 @@ int ssl_get_with_curl(char *url, curlmembuf* buffer, char* username,
   
   curl_easy_setopt(curl, CURLOPT_VERBOSE, (long)curl_verbose);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curlToMemCallback);
-  snprintf(agentStr,MAXLEN,"FITSIO/HEASARC/%-8.3f",ffvers(&version)); 
+  snprintf(agentStr,MAXLEN,"FITSIO/HEASARC/%-8.4f",ffvers(&version)); 
   curl_easy_setopt(curl, CURLOPT_USERAGENT,agentStr);
   
   buffer->memory = 0; /* malloc/realloc will grow this in the callback function */
@@ -2643,7 +2643,7 @@ static int ftp_open_network(char *filename, FILE **ftpfile, FILE **command, int 
   port = 21;
   /* We might have a user name.  If not, set defaults for username and password */
   username = "anonymous";
-  snprintf(agentStr,SHORTLEN,"User-Agent: FITSIO/HEASARC/%-8.3f",ffvers(&version));
+  snprintf(agentStr,SHORTLEN,"User-Agent: FITSIO/HEASARC/%-8.4f",ffvers(&version));
   password = agentStr;
   /* is there an @ sign */
   if (NULL != (newhost = strrchr(host,'@'))) {
@@ -3294,6 +3294,7 @@ static int NET_ParseUrl(const char *url, char *proto, char *host, int *port,
   char *ptrstr;
   char *thost;
   int isftp = 0;
+  size_t icount;
 
   /* figure out if there is a http: or  ftp: */
 
@@ -3356,19 +3357,21 @@ static int NET_ParseUrl(const char *url, char *proto, char *host, int *port,
     if ((thost = strchr(urlcopy, '@')) != NULL)
       urlcopy = thost+1;
 
-    if (strlen(urlcopy) > SHORTLEN-1)
+    thost = urlcopy;
+    icount=0;
+    while (*urlcopy != '/' && *urlcopy != ':' && *urlcopy) {
+      urlcopy++;
+      icount++;
+    }
+    if (icount > SHORTLEN-1)
     {
        free(urlcopyorig);
        return 1;
     }
-    strcpy(host,urlcopy);
-    thost = host;
-    while (*urlcopy != '/' && *urlcopy != ':' && *urlcopy) {
-      thost++;
-      urlcopy++;
-    }
+    strncpy(host,thost,icount);
+    host[icount] = '\0';
+    
     /* we should either be at the end of the string, have a /, or have a : */
-    *thost = '\0';
     if (*urlcopy == ':') {
       /* follows a port number */
       urlcopy++;
@@ -3377,18 +3380,20 @@ static int NET_ParseUrl(const char *url, char *proto, char *host, int *port,
     }
   } else {
     /* do this for ftp */
-    if (strlen(urlcopy) > SHORTLEN-1)
+    
+    thost = urlcopy;
+    icount = 0;
+    while (*urlcopy != '/' && *urlcopy) {
+      urlcopy++;
+      icount++;
+    }
+    if (icount > SHORTLEN-1)
     {
        free(urlcopyorig);
        return 1;
     }
-    strcpy(host,urlcopy);
-    thost = host;
-    while (*urlcopy != '/' && *urlcopy) {
-      thost++;
-      urlcopy++; 
-    }
-    *thost = '\0';
+    strncpy(host,thost,icount);
+    host[icount] = '\0';
     /* Now, we should either be at the end of the string, or have a / */
     
   }

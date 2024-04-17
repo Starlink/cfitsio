@@ -906,6 +906,15 @@ expr:    LONG
 		      YYERROR;
 		   }
                 }
+
+
+       | GTIOVERLAP STRING ',' expr ',' expr ')'
+                {  $$ = New_GTI(lParse, gtiover_fct,  $2, $4, $6, "*START*", "*STOP*");
+                   TEST($$);                                        }
+       | GTIOVERLAP STRING ',' expr ',' expr ',' STRING ',' STRING ')'
+                {  $$ = New_GTI(lParse, gtiover_fct,  $2, $4, $6, $8, $10 );
+                   TEST($$);                                        }
+
        | expr '[' expr ']'
                 { $$ = New_Deref(lParse,  $1, 1, $3,  0,  0,  0,   0 ); TEST($$); }
        | expr '[' expr ',' expr ']'
@@ -1186,13 +1195,6 @@ bexpr:   BOOLEAN
                 {  $$ = New_GTI(lParse, gtifilt_fct,  $2, $4, -99, $6, $8 );
                    TEST($$);                                        }
 
-
-       | GTIOVERLAP STRING ',' expr ',' expr ')'
-                {  $$ = New_GTI(lParse, gtiover_fct,  $2, $4, $6, "*START*", "*STOP*");
-                   TEST($$);                                        }
-       | GTIOVERLAP STRING ',' expr ',' expr ',' STRING ',' STRING ')'
-                {  $$ = New_GTI(lParse, gtiover_fct,  $2, $4, $6, $8, $10 );
-                   TEST($$);                                        }
 
        /* GTIFIND('myfile.gti', TIME_EXPR, 'START', 'STOP') */
        | GTIFIND ')'
@@ -1845,17 +1847,23 @@ static int New_GTI( ParseData *lParse, funcOp Op, char *fname, int Node1, int No
 	 return(-1);
       that0->value.nelem = nrows;
       if( nrows ) {
+	 double *startptr = 0, *stopptr = 0;
 
+	 /* We are allocating storage for both START and STOP with one pointer
+	    and stop is stored at dblptr+nrows, we will use aliases below to
+	    make this easier to read */
 	 that0->value.data.dblptr = (double*)malloc( 2*nrows*sizeof(double) );
 	 if( !that0->value.data.dblptr ) {
 	    lParse->status = MEMORY_ALLOCATION;
 	    return(-1);
 	 }
+	 startptr = that0->value.data.dblptr;
+	 stopptr  = that0->value.data.dblptr + nptr;
 	 
 	 ffgcvd( fptr, startCol, 1L, 1L, nrows, 0.0,
-		 that0->value.data.dblptr, &i, &lParse->status );
+		 startptr, &i, &lParse->status );
 	 ffgcvd( fptr, stopCol, 1L, 1L, nrows, 0.0,
-		 that0->value.data.dblptr+nrows, &i, &lParse->status );
+		 stopptr, &i, &lParse->status );
 	 if( lParse->status ) {
 	    free( that0->value.data.dblptr );
 	    return(-1);
@@ -1865,14 +1873,13 @@ static int New_GTI( ParseData *lParse, funcOp Op, char *fname, int Node1, int No
 
 	 that0->type = 1; /*  Assume yes  */
 	 i = nrows;
-	 while( --i )
-	    if(    that0->value.data.dblptr[i-1]
-                   >= that0->value.data.dblptr[i]
-		|| that0->value.data.dblptr[i-1+nrows]
-		   >= that0->value.data.dblptr[i+nrows] ) {
-	       that0->type = 0;
-	       break;
-	    }
+	 while( --i ) { /* the following are failure conditions for GTI ordering */
+	   if( (startptr[i] > stopptr [i]) ||      /* START{i} > STOP{i} */
+	       (starptr[i]  < stopptr[i-1]) ) {     /* START{i} < STOP{i-1} */
+	     that0->type = 0;
+	     break;
+	   }
+	 }
 
 	 /* GTIOVERLAP() requires ordered GTI */
 	 if (that0->type != 1 && Op == gtiover_fct) {
@@ -1883,13 +1890,13 @@ static int New_GTI( ParseData *lParse, funcOp Op, char *fname, int Node1, int No
 	 /*  Handle TIMEZERO offset, if any  */
 	 
 	 dt = (timeZeroI[1] - timeZeroI[0]) + (timeZeroF[1] - timeZeroF[0]);
-	 timeSpan = that0->value.data.dblptr[nrows+nrows-1]
-	    - that0->value.data.dblptr[0];
+	 timeSpan = stopptr[nrows-1] - startptr[0];
 	 if (timeSpan == 0) timeSpan = 1.0;
 	 
 	 if( fabs( dt / timeSpan ) > 1e-12 ) {
-	    for( i=0; i<(nrows+nrows); i++ )
-	       that0->value.data.dblptr[i] += dt;
+	   for( i=0; i<nrows; i++ ) {
+	     startptr[i] += dt;
+	     stopptr[i]  += dt;
 	 }
       }
       /* If Node1 is constant (gtifilt_fct) or
@@ -2098,11 +2105,6 @@ static int New_Array( ParseData *lParse, int valueNode, int dimNode )
 	- 5 or fewer dimensions 
    */
 
-   if (SIZE(valueNode) > 1) {
-     yyerror(0, lParse, "ARRAY(V,n) value V must have vector dimension of 1");
-     return (-1);
-   }
-
    dims = &(lParse->Nodes[dimNode]);
    for (i=0; i<MAXDIMS; i++) naxes[i] = 1;
 
@@ -2139,6 +2141,16 @@ static int New_Array( ParseData *lParse, int valueNode, int dimNode )
      nelem *= naxes[i];
    }
 
+   if (SIZE(valueNode) == nelem && nelem > 1) {
+     /* "reform" operation - do nothing */
+   } else if (SIZE(valueNode) > 1 && nelem > 1) {
+     yyerror(0, lParse, "ARRAY(V,d) mismatch between number of elements in V and d");
+     return (-1);
+   } else if (SIZE(valueNode) > 1) {
+     yyerror(0, lParse, "ARRAY(V,n) value V must have vector dimension of 1");
+     return (-1);
+   }
+   
    n = Alloc_Node(lParse);
    if( n>=0 ) {
       this             = lParse->Nodes + n;
@@ -5998,8 +6010,8 @@ static void Do_Array( ParseData *lParse, Node *this )
      if( that->operation == CONST_OP ) {
 
        idx = lParse->nRows*this->value.nelem + offset;
-       while( (idx--)>=0 ) {
-	       
+       while( idx-- ) {
+
 	 this->value.undef[idx] = 0;
 
 	 switch( this->type ) {
@@ -6014,8 +6026,30 @@ static void Do_Array( ParseData *lParse, Node *this )
 	   break;
 	 }
        }
+
+     } else if (that->value.nelem > 1) { /* array "REFORM" */
+       /* Note that dimensions change but total number of elements is same,
+	  so we just do a straight copy */
+      
+       idx = lParse->nRows*this->value.nelem;
+       while( idx-- ) {
+
+	 this->value.undef[idx] = that->value.undef[idx];
+
+	 switch( this->type ) {
+	 case BOOLEAN:
+	   this->value.data.logptr[idx] = that->value.data.logptr[idx];
+	   break;
+	 case LONG:
+	   this->value.data.lngptr[idx] = that->value.data.lngptr[idx];
+	   break;
+	 case DOUBLE:
+	   this->value.data.dblptr[idx] = that->value.data.dblptr[idx];
+	   break;
+	 }
+       }
        
-     } else {
+     } else { /* Any promotion of scalar to vector/array */
        
        row  = lParse->nRows;
        idx  = row * this->value.nelem - 1;

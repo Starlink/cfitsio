@@ -34,11 +34,11 @@ SERVICES PROVIDED HEREUNDER."
 #ifndef _FITSIO_H
 #define _FITSIO_H
 
-#define CFITSIO_VERSION 4.2.0
+#define CFITSIO_VERSION 4.4.0
 /* Minor and micro numbers must not exceed 99 under current method
    of version representataion in ffvers(). */
 #define CFITSIO_MICRO 0
-#define CFITSIO_MINOR 2
+#define CFITSIO_MINOR 4
 #define CFITSIO_MAJOR 4
 #define CFITSIO_SONAME 10
 
@@ -285,7 +285,6 @@ SERVICES PROVIDED HEREUNDER."
 #define READWRITE 1
 
 /* adopt a hopefully obscure number to use as a null value flag */
-/* could be problems if the FITS files contain data with these values */
 #define FLOATNULLVALUE -9.11912E-36F
 #define DOUBLENULLVALUE -9.1191291391491E-36
  
@@ -956,9 +955,12 @@ int CFITS_API ffgky( fitsfile *fptr, int datatype, const char *keyname, void *va
            char *comm, int *status);
 int CFITS_API ffgkys(fitsfile *fptr, const char *keyname, char *value, char *comm, int *status);
 int CFITS_API ffgksl(fitsfile *fptr, const char *keyname, int *length, int *status);
+int CFITS_API ffgkcsl(fitsfile *fptr, const char *keyname, int *length, int *comlength, int *status);
 int CFITS_API ffgkls(fitsfile *fptr, const char *keyname, char **value, char *comm, int *status);
 int CFITS_API ffgsky(fitsfile *fptr, const char *keyname, int firstchar, int maxchar,
                char *value, int *valuelen, char *comm, int *status);
+int CFITS_API ffgskyc(fitsfile *fptr, const char *keyname, int firstchar, int maxchar,
+               int maxcomchar, char *value, int *valuelen, char *comm, int *comlen, int *status);
 int CFITS_API fffree(void *value,  int  *status); 
 int CFITS_API fffkls(char *value, int *status);
 int CFITS_API ffgkyl(fitsfile *fptr, const char *keyname, int *value, char *comm, int *status);
@@ -1032,6 +1034,7 @@ int CFITS_API ffukys(fitsfile *fptr, const char *keyname, const char *value, con
 int CFITS_API ffukls(fitsfile *fptr, const char *keyname, const char *value, const char *comm, int *status);
 int CFITS_API ffukyl(fitsfile *fptr, const char *keyname, int value, const char *comm, int *status);
 int CFITS_API ffukyj(fitsfile *fptr, const char *keyname, LONGLONG value, const char *comm, int *status);
+int CFITS_API ffukyuj(fitsfile *fptr, const char *keyname, ULONGLONG value, const char *comm, int *status);
 int CFITS_API ffukyf(fitsfile *fptr, const char *keyname, float value, int decim, const char *comm,
           int *status);
 int CFITS_API ffukye(fitsfile *fptr, const char *keyname, float value, int decim, const char *comm,
@@ -1059,6 +1062,7 @@ int CFITS_API ffmkys(fitsfile *fptr, const char *keyname, const char *value, con
 int CFITS_API ffmkls(fitsfile *fptr, const char *keyname, const char *value, const char *comm,int *status);
 int CFITS_API ffmkyl(fitsfile *fptr, const char *keyname, int value, const char *comm, int *status);
 int CFITS_API ffmkyj(fitsfile *fptr, const char *keyname, LONGLONG value, const char *comm, int *status);
+int CFITS_API ffmkyuj(fitsfile *fptr, const char *keyname, ULONGLONG value, const char *comm, int *status);
 int CFITS_API ffmkyf(fitsfile *fptr, const char *keyname, float value, int decim, const char *comm,
           int *status);
 int CFITS_API ffmkye(fitsfile *fptr, const char *keyname, float value, int decim, const char *comm,
