@@ -906,6 +906,15 @@ expr:    LONG
 		      YYERROR;
 		   }
                 }
+
+
+       | GTIOVERLAP STRING ',' expr ',' expr ')'
+                {  $$ = New_GTI(lParse, gtiover_fct,  $2, $4, $6, "*START*", "*STOP*");
+                   TEST($$);                                        }
+       | GTIOVERLAP STRING ',' expr ',' expr ',' STRING ',' STRING ')'
+                {  $$ = New_GTI(lParse, gtiover_fct,  $2, $4, $6, $8, $10 );
+                   TEST($$);                                        }
+
        | expr '[' expr ']'
                 { $$ = New_Deref(lParse,  $1, 1, $3,  0,  0,  0,   0 ); TEST($$); }
        | expr '[' expr ',' expr ']'
@@ -1186,13 +1195,6 @@ bexpr:   BOOLEAN
                 {  $$ = New_GTI(lParse, gtifilt_fct,  $2, $4, -99, $6, $8 );
                    TEST($$);                                        }
 
-
-       | GTIOVERLAP STRING ',' expr ',' expr ')'
-                {  $$ = New_GTI(lParse, gtiover_fct,  $2, $4, $6, "*START*", "*STOP*");
-                   TEST($$);                                        }
-       | GTIOVERLAP STRING ',' expr ',' expr ',' STRING ',' STRING ')'
-                {  $$ = New_GTI(lParse, gtiover_fct,  $2, $4, $6, $8, $10 );
-                   TEST($$);                                        }
 
        /* GTIFIND('myfile.gti', TIME_EXPR, 'START', 'STOP') */
        | GTIFIND ')'
@@ -2098,11 +2100,6 @@ static int New_Array( ParseData *lParse, int valueNode, int dimNode )
 	- 5 or fewer dimensions 
    */
 
-   if (SIZE(valueNode) > 1) {
-     yyerror(0, lParse, "ARRAY(V,n) value V must have vector dimension of 1");
-     return (-1);
-   }
-
    dims = &(lParse->Nodes[dimNode]);
    for (i=0; i<MAXDIMS; i++) naxes[i] = 1;
 
@@ -2139,6 +2136,16 @@ static int New_Array( ParseData *lParse, int valueNode, int dimNode )
      nelem *= naxes[i];
    }
 
+   if (SIZE(valueNode) == nelem && nelem > 1) {
+     /* "reform" operation - do nothing */
+   } else if (SIZE(valueNode) > 1 && nelem > 1) {
+     yyerror(0, lParse, "ARRAY(V,d) mismatch between number of elements in V and d");
+     return (-1);
+   } else if (SIZE(valueNode) > 1) {
+     yyerror(0, lParse, "ARRAY(V,n) value V must have vector dimension of 1");
+     return (-1);
+   }
+   
    n = Alloc_Node(lParse);
    if( n>=0 ) {
       this             = lParse->Nodes + n;
@@ -5998,8 +6005,8 @@ static void Do_Array( ParseData *lParse, Node *this )
      if( that->operation == CONST_OP ) {
 
        idx = lParse->nRows*this->value.nelem + offset;
-       while( (idx--)>=0 ) {
-	       
+       while( idx-- ) {
+
 	 this->value.undef[idx] = 0;
 
 	 switch( this->type ) {
@@ -6014,8 +6021,30 @@ static void Do_Array( ParseData *lParse, Node *this )
 	   break;
 	 }
        }
+
+     } else if (that->value.nelem > 1) { /* array "REFORM" */
+       /* Note that dimensions change but total number of elements is same,
+	  so we just do a straight copy */
+      
+       idx = lParse->nRows*this->value.nelem;
+       while( idx-- ) {
+
+	 this->value.undef[idx] = that->value.undef[idx];
+
+	 switch( this->type ) {
+	 case BOOLEAN:
+	   this->value.data.logptr[idx] = that->value.data.logptr[idx];
+	   break;
+	 case LONG:
+	   this->value.data.lngptr[idx] = that->value.data.lngptr[idx];
+	   break;
+	 case DOUBLE:
+	   this->value.data.dblptr[idx] = that->value.data.dblptr[idx];
+	   break;
+	 }
+       }
        
-     } else {
+     } else { /* Any promotion of scalar to vector/array */
        
        row  = lParse->nRows;
        idx  = row * this->value.nelem - 1;
