@@ -99,9 +99,8 @@ host_triplet = @host@
 target_triplet = @target@
 @NOFORTRAN_FALSE@am__append_1 = $(F77_WRAPPERS)
 @NOGSIFTP_FALSE@am__append_2 = ${GSIFTP_SRC}
-bin_PROGRAMS = cookbook$(EXEEXT) fitscopy$(EXEEXT) fitsverify$(EXEEXT) \
-	fpack$(EXEEXT) funpack$(EXEEXT) imcopy$(EXEEXT) smem$(EXEEXT) \
-	speed$(EXEEXT)
+bin_PROGRAMS = fitscopy$(EXEEXT) fitsverify$(EXEEXT) fpack$(EXEEXT) \
+	funpack$(EXEEXT) imcopy$(EXEEXT)
 noinst_PROGRAMS = testprog$(EXEEXT) $(am__EXEEXT_1)
 @NOFORTRAN_FALSE@am__append_3 = testf77
 subdir = .
@@ -214,10 +213,6 @@ libcfitsio_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 @NOFORTRAN_FALSE@am__EXEEXT_1 = testf77$(EXEEXT)
 PROGRAMS = $(bin_PROGRAMS) $(noinst_PROGRAMS)
 am__dirstamp = $(am__leading_dot)dirstamp
-am_cookbook_OBJECTS = utilities/cookbook.$(OBJEXT)
-cookbook_OBJECTS = $(am_cookbook_OBJECTS)
-cookbook_LDADD = $(LDADD)
-cookbook_DEPENDENCIES = libcfitsio.la $(am__DEPENDENCIES_1)
 am_fitscopy_OBJECTS = utilities/fitscopy.$(OBJEXT)
 fitscopy_OBJECTS = $(am_fitscopy_OBJECTS)
 fitscopy_LDADD = $(LDADD)
@@ -248,14 +243,6 @@ am_imcopy_OBJECTS = utilities/imcopy.$(OBJEXT)
 imcopy_OBJECTS = $(am_imcopy_OBJECTS)
 imcopy_LDADD = $(LDADD)
 imcopy_DEPENDENCIES = libcfitsio.la $(am__DEPENDENCIES_1)
-am_smem_OBJECTS = utilities/smem.$(OBJEXT)
-smem_OBJECTS = $(am_smem_OBJECTS)
-smem_LDADD = $(LDADD)
-smem_DEPENDENCIES = libcfitsio.la $(am__DEPENDENCIES_1)
-am_speed_OBJECTS = utilities/speed.$(OBJEXT)
-speed_OBJECTS = $(am_speed_OBJECTS)
-speed_LDADD = $(LDADD)
-speed_DEPENDENCIES = libcfitsio.la $(am__DEPENDENCIES_1)
 am__testf77_SOURCES_DIST = utilities/testf77.f
 @NOFORTRAN_FALSE@am_testf77_OBJECTS = utilities/testf77.$(OBJEXT)
 testf77_OBJECTS = $(am_testf77_OBJECTS)
@@ -315,14 +302,12 @@ AM_V_FCLD = $(am__v_FCLD_@AM_V@)
 am__v_FCLD_ = $(am__v_FCLD_@AM_DEFAULT_V@)
 am__v_FCLD_0 = @echo "  FCLD    " $@;
 am__v_FCLD_1 = 
-SOURCES = $(libcfitsio_la_SOURCES) $(cookbook_SOURCES) \
-	$(fitscopy_SOURCES) $(fitsverify_SOURCES) $(fpack_SOURCES) \
-	$(funpack_SOURCES) $(imcopy_SOURCES) $(smem_SOURCES) \
-	$(speed_SOURCES) $(testf77_SOURCES) $(testprog_SOURCES)
-DIST_SOURCES = $(am__libcfitsio_la_SOURCES_DIST) $(cookbook_SOURCES) \
-	$(fitscopy_SOURCES) $(fitsverify_SOURCES) $(fpack_SOURCES) \
-	$(funpack_SOURCES) $(imcopy_SOURCES) $(smem_SOURCES) \
-	$(speed_SOURCES) $(am__testf77_SOURCES_DIST) \
+SOURCES = $(libcfitsio_la_SOURCES) $(fitscopy_SOURCES) \
+	$(fitsverify_SOURCES) $(fpack_SOURCES) $(funpack_SOURCES) \
+	$(imcopy_SOURCES) $(testf77_SOURCES) $(testprog_SOURCES)
+DIST_SOURCES = $(am__libcfitsio_la_SOURCES_DIST) $(fitscopy_SOURCES) \
+	$(fitsverify_SOURCES) $(fpack_SOURCES) $(funpack_SOURCES) \
+	$(imcopy_SOURCES) $(am__testf77_SOURCES_DIST) \
 	$(testprog_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
@@ -754,12 +739,6 @@ utilities/$(am__dirstamp):
 utilities/$(DEPDIR)/$(am__dirstamp):
 	@$(MKDIR_P) utilities/$(DEPDIR)
 	@: > utilities/$(DEPDIR)/$(am__dirstamp)
-utilities/cookbook.$(OBJEXT): utilities/$(am__dirstamp) \
-	utilities/$(DEPDIR)/$(am__dirstamp)
-
-cookbook$(EXEEXT): $(cookbook_OBJECTS) $(cookbook_DEPENDENCIES) $(EXTRA_cookbook_DEPENDENCIES) 
-	@rm -f cookbook$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(cookbook_LDFLAGS) $(cookbook_OBJECTS) $(cookbook_LDADD) $(LIBS) 
 utilities/fitscopy.$(OBJEXT): utilities/$(am__dirstamp) \
 	utilities/$(DEPDIR)/$(am__dirstamp)
 
@@ -802,18 +781,6 @@ utilities/imcopy.$(OBJEXT): utilities/$(am__dirstamp) \
 imcopy$(EXEEXT): $(imcopy_OBJECTS) $(imcopy_DEPENDENCIES) $(EXTRA_imcopy_DEPENDENCIES) 
 	@rm -f imcopy$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(imcopy_LDFLAGS) $(imcopy_OBJECTS) $(imcopy_LDADD) $(LIBS) 
-utilities/smem.$(OBJEXT): utilities/$(am__dirstamp) \
-	utilities/$(DEPDIR)/$(am__dirstamp)
-
-smem$(EXEEXT): $(smem_OBJECTS) $(smem_DEPENDENCIES) $(EXTRA_smem_DEPENDENCIES) 
-	@rm -f smem$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(smem_LDFLAGS) $(smem_OBJECTS) $(smem_LDADD) $(LIBS) 
-utilities/speed.$(OBJEXT): utilities/$(am__dirstamp) \
-	utilities/$(DEPDIR)/$(am__dirstamp)
-
-speed$(EXEEXT): $(speed_OBJECTS) $(speed_DEPENDENCIES) $(EXTRA_speed_DEPENDENCIES) 
-	@rm -f speed$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(speed_LDFLAGS) $(speed_OBJECTS) $(speed_LDADD) $(LIBS) 
 utilities/testf77.$(OBJEXT): utilities/$(am__dirstamp) \
 	utilities/$(DEPDIR)/$(am__dirstamp)
 
@@ -900,7 +867,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcfitsio_la-wcsutil.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcfitsio_la-zcompress.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcfitsio_la-zuncompress.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@utilities/$(DEPDIR)/cookbook.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@utilities/$(DEPDIR)/fitscopy.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@utilities/$(DEPDIR)/fitsverify-ftverify.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@utilities/$(DEPDIR)/fitsverify-fvrf_data.Po@am__quote@
@@ -912,8 +878,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@utilities/$(DEPDIR)/fpackutil.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@utilities/$(DEPDIR)/funpack.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@utilities/$(DEPDIR)/imcopy.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@utilities/$(DEPDIR)/smem.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@utilities/$(DEPDIR)/speed.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@utilities/$(DEPDIR)/testprog.Po@am__quote@
 
 .c.o:

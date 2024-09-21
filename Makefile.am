@@ -121,14 +121,11 @@ install-exec-hook:
 AUTOMAKE_OPTIONS = subdir-objects
 
 bin_PROGRAMS = \
-	cookbook \
 	fitscopy \
 	fitsverify \
 	fpack \
 	funpack \
-	imcopy \
-	smem \
-	speed
+	imcopy
 
 noinst_PROGRAMS = testprog
 
