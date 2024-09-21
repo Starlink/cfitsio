@@ -1,18 +1,27 @@
 *~
+.*.swp
 
 # Build files
 *.o
 *.a
+*.lo
+*.la
 *.so
 *.so.*
 *.dylib
 *.cache/
 
-Makefile
-cfitsio.pc
-config.log
-config.status
-configure.lineno
+/.deps
+/.libs
+/utilities/.deps
+/utilities/.dirstamp
+
+/Makefile
+/libtool
+/cfitsio.pc
+/config.log
+/config.status
+/configure.lineno
 /cookbook
 /fitscopy
 /fitsverify
@@ -22,6 +31,7 @@ configure.lineno
 /listhead
 /smem
 /speed
+/testf77
 /testprog
 
 # Mac
