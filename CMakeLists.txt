@@ -26,7 +26,7 @@ set(CMAKE_INCLUDE_CURRENT_DIR_IN_INTERFACE ON)
 SET(${PROJECT_NAME}_SONAME 10)
 SET(${PROJECT_NAME}_MAJOR 4)
 SET(${PROJECT_NAME}_MINOR 6)
-SET(${PROJECT_NAME}_MICRO 0)
+SET(${PROJECT_NAME}_MICRO 2)
 SET(${PROJECT_NAME}_VERSION ${${PROJECT_NAME}_MAJOR}.${${PROJECT_NAME}_MINOR}.${${PROJECT_NAME}_MICRO})
 SET(LIB_NAME cfitsio)
 
@@ -40,6 +40,7 @@ INCLUDE(CheckLibraryExists)
 INCLUDE(CheckFunctionExists)
 INCLUDE(CheckSymbolExists)
 INCLUDE(CheckCSourceCompiles)
+INCLUDE(GNUInstallDirs)
 
 #==============================================================================
 # Build options:
@@ -291,14 +292,14 @@ set_property(TARGET cfitsio APPEND PROPERTY
 )
 
 install(TARGETS cfitsio EXPORT cfitsioTargets
-  LIBRARY DESTINATION lib
-  ARCHIVE DESTINATION lib
-  RUNTIME DESTINATION bin
-  INCLUDES DESTINATION include
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
 install(FILES ${H_FILES} "${CMAKE_CURRENT_BINARY_DIR}/cfitsio_export.h"
-        DESTINATION include COMPONENT Devel)
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT Devel)
 
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(
@@ -316,7 +317,7 @@ configure_file(cmake/cfitsioConfig.cmake
   COPYONLY
 )
 
-set(ConfigPackageLocation lib/cmake/cfitsio)
+set(ConfigPackageLocation ${CMAKE_INSTALL_LIBDIR}/cmake/cfitsio)
 install(EXPORT cfitsioTargets
   FILE
     cfitsioTargets.cmake
@@ -337,7 +338,7 @@ install(
 
 # cfitsio.pc:
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cfitsio.pc.cmake ${CMAKE_CURRENT_BINARY_DIR}/cfitsio.pc @ONLY)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/cfitsio.pc DESTINATION lib/pkgconfig)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/cfitsio.pc DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
 #==============================================================================
 # Test programs:
@@ -399,9 +400,9 @@ IF (UTILS)
       set_target_properties(fpack funpack PROPERTIES LINK_FLAGS "setargv.obj")
     endif()
 
-    install(TARGETS fpack funpack fitscopy fitsverify imcopy speed RUNTIME DESTINATION bin)
+    install(TARGETS fpack funpack fitscopy fitsverify imcopy speed RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     IF(HAVE_SHMEM_SERVICES)
-      install(TARGETS smem RUNTIME DESTINATION bin)
+      install(TARGETS smem RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     ENDIF()
 
 ENDIF(UTILS)
