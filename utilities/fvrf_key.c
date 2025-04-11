@@ -40,7 +40,7 @@ int fits_parse_card(FILE *out,		/* output file pointer */
     /* take out the trailing space */  
     i = 7; 
     p = &kname[7];
-    while(isspace((int)*p) && i >= 0) {*p = '\0'; p--; i--;} 
+    while(i >= 0 && isspace((int)*p)) {*p = '\0'; p--; i--;} 
     
     /* Whether the keyword name is left justified */
     i = 0;
@@ -214,11 +214,12 @@ void get_str(char **pt,     		/* card string from character 11*/
     p--;
     if(*p != '\'') *stat |= NO_TRAIL_QUOTE; 
     pi++;	    
-    nchar = p - pi ;     /* excluding the ' */ 
-    strncpy(kvalue,pi,nchar);
+    nchar = p - pi ;     /* excluding the ' */
+    if (nchar < 0) nchar = 0; 
+    strncpy(kvalue,pi,(size_t)nchar);
     *(kvalue+nchar) = '\0'; 
     pi = kvalue + (nchar -1) ; 
-    while(isspace((int)*pi)){ *pi = '\0'; pi--;} /* delete the trailing space */ 
+    while(pi >= kvalue && isspace((int)*pi)){ *pi = '\0'; pi--;} /* delete the trailing space */ 
     p++;				  /* skip the  ' */
     while(isspace((int)*p) && *p != '\0')  p++; 
     *pt = p;

@@ -22,6 +22,7 @@
 #define STAR_TYPEDEF_PARSEDATA
 typedef struct ParseData_struct ParseData;
 #endif
+/* An opaque pointer. */
 #ifndef YY_TYPEDEF_YY_SCANNER_T
 #define YY_TYPEDEF_YY_SCANNER_T
 typedef void* yyscan_t;
