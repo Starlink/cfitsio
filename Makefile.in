@@ -232,13 +232,12 @@ fitsverify_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 am_fpack_OBJECTS = utilities/fpack.$(OBJEXT) \
 	utilities/fpackutil.$(OBJEXT)
 fpack_OBJECTS = $(am_fpack_OBJECTS)
-fpack_LDADD = $(LDADD)
-fpack_DEPENDENCIES = libcfitsio.la $(am__DEPENDENCIES_1)
+am__DEPENDENCIES_2 = libcfitsio.la $(am__DEPENDENCIES_1)
+fpack_DEPENDENCIES = $(am__DEPENDENCIES_2)
 am_funpack_OBJECTS = utilities/funpack.$(OBJEXT) \
 	utilities/fpackutil.$(OBJEXT)
 funpack_OBJECTS = $(am_funpack_OBJECTS)
-funpack_LDADD = $(LDADD)
-funpack_DEPENDENCIES = libcfitsio.la $(am__DEPENDENCIES_1)
+funpack_DEPENDENCIES = $(am__DEPENDENCIES_2)
 am_imcopy_OBJECTS = utilities/imcopy.$(OBJEXT)
 imcopy_OBJECTS = $(am_imcopy_OBJECTS)
 imcopy_LDADD = $(LDADD)
@@ -423,6 +422,7 @@ LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
 LT_SYS_LIBRARY_PATH = @LT_SYS_LIBRARY_PATH@
+MAINT = @MAINT@
 MAKEINFO = @MAKEINFO@
 MANIFEST_TOOL = @MANIFEST_TOOL@
 MKDIR_P = @MKDIR_P@
@@ -549,7 +549,9 @@ fitsverify_SOURCES = utilities/ftverify.c utilities/fvrf_data.c \
 		     utilities/fvrf_key.c utilities/fvrf_misc.c
 
 fpack_SOURCES = utilities/fpack.c utilities/fpackutil.c
+fpack_LDADD = -lm ${LDADD}
 funpack_SOURCES = utilities/funpack.c utilities/fpackutil.c
+funpack_LDADD = -lm ${LDADD}
 imcopy_SOURCES = utilities/imcopy.c
 smem_SOURCES = utilities/smem.c
 speed_SOURCES = utilities/speed.c
@@ -585,7 +587,7 @@ all: all-am
 .SUFFIXES: .c .f .lo .o .obj
 am--refresh: Makefile
 	@:
-$(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
+$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \
@@ -611,9 +613,9 @@ Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 $(top_builddir)/config.status: $(top_srcdir)/configure $(CONFIG_STATUS_DEPENDENCIES)
 	$(SHELL) ./config.status --recheck
 
-$(top_srcdir)/configure:  $(am__configure_deps)
+$(top_srcdir)/configure: @MAINTAINER_MODE_TRUE@ $(am__configure_deps)
 	$(am__cd) $(srcdir) && $(AUTOCONF)
-$(ACLOCAL_M4):  $(am__aclocal_m4_deps)
+$(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
 	$(am__cd) $(srcdir) && $(ACLOCAL) $(ACLOCAL_AMFLAGS)
 $(am__aclocal_m4_deps):
 cfitsio.pc: $(top_builddir)/config.status $(srcdir)/cfitsio.pc.in
