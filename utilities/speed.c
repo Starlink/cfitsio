@@ -2,7 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+
+#ifndef _MSC_VER
 #include <sys/time.h>
+#endif
 
 /*
   Every program which uses the CFITSIO interface must include the
@@ -68,11 +71,19 @@ int main()
     long rawloop;
     char filename[] = "speedcc.fit";           /* name for new FITS file */
     char buffer[2880] = {2880 * 0};
-    time_t tbegin, tend;
+    #ifndef _MSC_VER
+        struct timeval tbegin, tend;
+    #else
+        time_t tbegin, tend;
+    #endif
     float rate, size, elapcpu, cpufrac;
     double elapse;
 
-    tbegin = time(0);
+    #ifndef _MSC_VER
+        gettimeofday(&tbegin, NULL);
+    #else
+        tbegin = time(0);
+    #endif
 
     remove(filename);               /* Delete old file if it already exists */
 
@@ -88,6 +99,8 @@ int main()
       if (fwrite(buffer, 1, 2880, diskfile) != 2880)
         printf("write error \n");
 
+    fflush(diskfile);  /* flush all buffers to disk */
+    
     gettime(&elapse, &elapcpu, &status);
 
     cpufrac = elapcpu / elapse * 100.;
@@ -153,8 +166,13 @@ int main()
     if (fits_close_file(fptr, &status))     
          printerror( status );
 
-    tend = time(0);
-    elapse = difftime(tend, tbegin) + 0.5;
+    #ifndef _MSC_VER
+        gettimeofday(&tend, NULL);
+        elapse = tend.tv_sec-tbegin.tv_sec+(tend.tv_usec-tbegin.tv_usec)*1.e-6 ;
+    #else
+        tend = time(0);
+        elapse = difftime(tend, tbegin) + 0.5;
+    #endif
     printf("Total elapsed time = %.3fs, status = %d\n",elapse, status);
     return(0);
 }
@@ -505,11 +523,12 @@ void printerror( int status)
     exit( status );       /* terminate the program, returning error status */
 }
 /*--------------------------------------------------------------------------*/
-int marktime( int *status)
+int marktime(int *status)
 {
+#ifndef _MSC_VER
     double telapse;
     time_t temp;
-    struct  timeval tv;
+    struct timeval tv;
 
     temp = time(0);
 
@@ -520,8 +539,8 @@ int marktime( int *status)
 
     telapse = 0.;
 
-        scpu = clock();
-        start = time(0);
+    scpu = clock();
+    start = time(0);
 /*
     while (telapse == 0.)
     {
@@ -530,33 +549,42 @@ int marktime( int *status)
         telapse = difftime( start, temp );
     }
 */
-        gettimeofday (&tv, NULL);
+    gettimeofday(&tv, NULL);
 
-	startsec = tv.tv_sec;
-        startmilli = tv.tv_usec/1000;
+    startsec = tv.tv_sec;
+    startmilli = tv.tv_usec/1000;
+#else
+/* don't support high timing precision on Windows machines */
+    startsec = 0;
+    startmilli = 0;
 
+    scpu = clock();
+#endif
     return( *status );
 }
 /*--------------------------------------------------------------------------*/
 int gettime(double *elapse, float *elapscpu, int *status)
 {
-        struct  timeval tv;
-	int stopmilli;
-	long stopsec;
+#ifndef _MSC_VER
+    struct  timeval tv;
+    int stopmilli;
+    long stopsec;
 
-
-        gettimeofday (&tv, NULL);
+    gettimeofday(&tv, NULL);
     ecpu = clock();
     finish = time(0);
 
-        stopmilli = tv.tv_usec/1000;
-	stopsec = tv.tv_sec;
-	
+    stopmilli = tv.tv_usec/1000;
+    stopsec = tv.tv_sec;
 
-	*elapse = (stopsec - startsec) + (stopmilli - startmilli)/1000.;
+    *elapse = (stopsec - startsec) + (stopmilli - startmilli)/1000.;
 
 /*    *elapse = difftime(finish, start) + 0.5; */
     *elapscpu = (ecpu - scpu) * 1.0 / CLOCKTICKS;
-
+#else
+/* set the elapsed time the same as the CPU time on Windows machines */
+    *elapscpu = (float) ((ecpu - scpu) * 1.0 / CLOCKTICKS);
+    *elapse = *elapscpu;  
+#endif
     return( *status );
 }
