@@ -1103,7 +1103,7 @@ int ffgtop(fitsfile *mfptr,  /* FITS file pointer to the member HDU          */
 	  *status = fits_read_key_longstr(mfptr,keyword,&tkeyvalue,comment,
 				      status);
 	  if (0 == *status) {
-	    strcpy(keyvalue,tkeyvalue);
+            snprintf(keyvalue,FLEN_FILENAME,"%s",tkeyvalue);
 	    free(tkeyvalue);
 	  }
 	  

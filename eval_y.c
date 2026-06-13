@@ -147,6 +147,7 @@
 #include <time.h>
 
 #include <stdlib.h>
+#include <limits.h>
 
 #ifndef alloca
 #define alloca malloc
@@ -154,6 +155,9 @@
 
 /* Random number generators for various distributions */
 #include "simplerng.h"
+#include <stdint.h>
+
+#define PARSER_VECTOR_MIN_ADDR ((uintptr_t)0x1000)
 
    /*  Shrink the initial stack depth to keep local data <32K (mac limit)  */
    /*  yacc will allocate more space if needed, though.                    */
@@ -225,6 +229,7 @@ static int  Test_Dims ( ParseData *, int Node1, int Node2 );
 static void Copy_Dims ( ParseData *, int Node1, int Node2 );
 
 static void Allocate_Ptrs( ParseData *, Node *this );
+static void free_node_buffer(Node *node);
 static void Do_Unary     ( ParseData *, Node *this );
 static void Do_Offset    ( ParseData *, Node *this );
 static void Do_BinOp_bit ( ParseData *, Node *this );
@@ -261,6 +266,7 @@ static void  bitor (char *result, char *bitstrm1, char *bitstrm2);
 static void  bitnot(char *result, char *bits);
 static int cstrmid(ParseData *lParse, char *dest_str, int dest_len,
 		   char *src_str,  int src_len, int pos);
+static int validate_double_vector(ParseData *lParse, Node *node);
 
 static void yyerror(yyscan_t scanner, ParseData *lParse, char *s);
 
@@ -269,7 +275,7 @@ static void yyerror(yyscan_t scanner, ParseData *lParse, char *s);
 #endif
 
 
-#line 273 "eval_y.c"
+#line 279 "eval_y.c"
 
 # ifndef YY_CAST
 #  ifdef __cplusplus
@@ -752,20 +758,20 @@ static const yytype_int8 yytranslate[] =
 /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
 static const yytype_int16 yyrline[] =
 {
-       0,   266,   266,   267,   270,   271,   277,   283,   289,   295,
-     298,   300,   313,   315,   328,   339,   353,   357,   361,   365,
-     367,   376,   379,   382,   391,   393,   395,   397,   399,   401,
-     404,   408,   410,   412,   414,   423,   425,   427,   430,   433,
-     436,   439,   442,   451,   460,   469,   472,   474,   476,   478,
-     482,   486,   505,   524,   543,   554,   568,   617,   629,   660,
-     774,   782,   885,   911,   914,   918,   920,   922,   924,   926,
-     928,   930,   932,   934,   938,   940,   942,   951,   954,   957,
-     960,   963,   966,   969,   972,   975,   978,   981,   984,   987,
-     990,   993,   996,   999,  1002,  1005,  1008,  1010,  1012,  1014,
-    1017,  1024,  1041,  1054,  1067,  1078,  1094,  1118,  1146,  1183,
-    1187,  1191,  1194,  1200,  1204,  1208,  1211,  1216,  1220,  1223,
-    1227,  1229,  1231,  1233,  1235,  1237,  1239,  1243,  1246,  1248,
-    1257,  1259,  1261,  1270,  1289,  1308
+       0,   272,   272,   273,   276,   277,   283,   289,   295,   301,
+     304,   306,   319,   321,   334,   345,   359,   363,   367,   371,
+     373,   382,   385,   388,   397,   399,   401,   403,   405,   407,
+     410,   414,   416,   418,   420,   429,   431,   433,   436,   439,
+     442,   445,   448,   457,   466,   475,   478,   480,   482,   484,
+     488,   492,   511,   530,   549,   560,   574,   623,   635,   666,
+     780,   788,   891,   917,   920,   924,   926,   928,   930,   932,
+     934,   936,   938,   940,   944,   946,   948,   957,   960,   963,
+     966,   969,   972,   975,   978,   981,   984,   987,   990,   993,
+     996,   999,  1002,  1005,  1008,  1011,  1014,  1016,  1018,  1020,
+    1023,  1030,  1047,  1060,  1073,  1084,  1100,  1124,  1152,  1189,
+    1193,  1197,  1200,  1206,  1210,  1214,  1217,  1222,  1226,  1229,
+    1233,  1235,  1237,  1239,  1241,  1243,  1245,  1249,  1252,  1254,
+    1263,  1265,  1267,  1276,  1295,  1314
 };
 #endif
 
@@ -1815,65 +1821,65 @@ yyreduce:
   switch (yyn)
     {
   case 4: /* line: '\n'  */
-#line 270 "eval.y"
+#line 276 "eval.y"
                      {}
-#line 1821 "eval_y.c"
+#line 1827 "eval_y.c"
     break;
 
   case 5: /* line: expr '\n'  */
-#line 272 "eval.y"
-                { if( (yyvsp[-1].Node)<0 ) {
-		     yyerror(scanner, lParse, "Couldn't build node structure: out of memory?");
-		     YYERROR;  }
-                  lParse->resultNode = (yyvsp[-1].Node);
-		}
-#line 1831 "eval_y.c"
-    break;
-
-  case 6: /* line: bexpr '\n'  */
 #line 278 "eval.y"
                 { if( (yyvsp[-1].Node)<0 ) {
 		     yyerror(scanner, lParse, "Couldn't build node structure: out of memory?");
 		     YYERROR;  }
                   lParse->resultNode = (yyvsp[-1].Node);
 		}
-#line 1841 "eval_y.c"
+#line 1837 "eval_y.c"
     break;
 
-  case 7: /* line: sexpr '\n'  */
+  case 6: /* line: bexpr '\n'  */
 #line 284 "eval.y"
-                { if( (yyvsp[-1].Node)<0 ) {
-		     yyerror(scanner, lParse, "Couldn't build node structure: out of memory?");
-		     YYERROR;  } 
-                  lParse->resultNode = (yyvsp[-1].Node);
-		}
-#line 1851 "eval_y.c"
-    break;
-
-  case 8: /* line: bits '\n'  */
-#line 290 "eval.y"
                 { if( (yyvsp[-1].Node)<0 ) {
 		     yyerror(scanner, lParse, "Couldn't build node structure: out of memory?");
 		     YYERROR;  }
                   lParse->resultNode = (yyvsp[-1].Node);
 		}
-#line 1861 "eval_y.c"
+#line 1847 "eval_y.c"
     break;
 
-  case 9: /* line: error '\n'  */
-#line 295 "eval.y"
-                     {  yyerrok;  }
+  case 7: /* line: sexpr '\n'  */
+#line 290 "eval.y"
+                { if( (yyvsp[-1].Node)<0 ) {
+		     yyerror(scanner, lParse, "Couldn't build node structure: out of memory?");
+		     YYERROR;  } 
+                  lParse->resultNode = (yyvsp[-1].Node);
+		}
+#line 1857 "eval_y.c"
+    break;
+
+  case 8: /* line: bits '\n'  */
+#line 296 "eval.y"
+                { if( (yyvsp[-1].Node)<0 ) {
+		     yyerror(scanner, lParse, "Couldn't build node structure: out of memory?");
+		     YYERROR;  }
+                  lParse->resultNode = (yyvsp[-1].Node);
+		}
 #line 1867 "eval_y.c"
     break;
 
-  case 10: /* bvector: '{' bexpr  */
-#line 299 "eval.y"
-                { (yyval.Node) = New_Vector(lParse,  (yyvsp[0].Node) ); TEST((yyval.Node)); }
+  case 9: /* line: error '\n'  */
+#line 301 "eval.y"
+                     {  yyerrok;  }
 #line 1873 "eval_y.c"
     break;
 
+  case 10: /* bvector: '{' bexpr  */
+#line 305 "eval.y"
+                { (yyval.Node) = New_Vector(lParse,  (yyvsp[0].Node) ); TEST((yyval.Node)); }
+#line 1879 "eval_y.c"
+    break;
+
   case 11: /* bvector: bvector ',' bexpr  */
-#line 301 "eval.y"
+#line 307 "eval.y"
                 {
                   if( lParse->Nodes[(yyvsp[-2].Node)].nSubNodes >= MAXSUBS ) {
 		     (yyvsp[-2].Node) = Close_Vec(lParse,  (yyvsp[-2].Node) ); TEST((yyvsp[-2].Node));
@@ -1884,17 +1890,17 @@ yyreduce:
 		  lParse->Nodes[(yyval.Node)].SubNodes[ lParse->Nodes[(yyval.Node)].nSubNodes++ ]
 		     = (yyvsp[0].Node);
                 }
-#line 1888 "eval_y.c"
-    break;
-
-  case 12: /* vector: '{' expr  */
-#line 314 "eval.y"
-                { (yyval.Node) = New_Vector(lParse,  (yyvsp[0].Node) ); TEST((yyval.Node)); }
 #line 1894 "eval_y.c"
     break;
 
+  case 12: /* vector: '{' expr  */
+#line 320 "eval.y"
+                { (yyval.Node) = New_Vector(lParse,  (yyvsp[0].Node) ); TEST((yyval.Node)); }
+#line 1900 "eval_y.c"
+    break;
+
   case 13: /* vector: vector ',' expr  */
-#line 316 "eval.y"
+#line 322 "eval.y"
                 {
                   if( TYPE((yyvsp[-2].Node)) < TYPE((yyvsp[0].Node)) )
                      TYPE((yyvsp[-2].Node)) = TYPE((yyvsp[0].Node));
@@ -1907,11 +1913,11 @@ yyreduce:
 		  lParse->Nodes[(yyval.Node)].SubNodes[ lParse->Nodes[(yyval.Node)].nSubNodes++ ]
 		     = (yyvsp[0].Node);
                 }
-#line 1911 "eval_y.c"
+#line 1917 "eval_y.c"
     break;
 
   case 14: /* vector: vector ',' bexpr  */
-#line 329 "eval.y"
+#line 335 "eval.y"
                 {
                   if( lParse->Nodes[(yyvsp[-2].Node)].nSubNodes >= MAXSUBS ) {
 		     (yyvsp[-2].Node) = Close_Vec(lParse,  (yyvsp[-2].Node) ); TEST((yyvsp[-2].Node));
@@ -1922,11 +1928,11 @@ yyreduce:
 		  lParse->Nodes[(yyval.Node)].SubNodes[ lParse->Nodes[(yyval.Node)].nSubNodes++ ]
 		     = (yyvsp[0].Node);
                 }
-#line 1926 "eval_y.c"
+#line 1932 "eval_y.c"
     break;
 
   case 15: /* vector: bvector ',' expr  */
-#line 340 "eval.y"
+#line 346 "eval.y"
                 {
                   TYPE((yyvsp[-2].Node)) = TYPE((yyvsp[0].Node));
                   if( lParse->Nodes[(yyvsp[-2].Node)].nSubNodes >= MAXSUBS ) {
@@ -1938,37 +1944,37 @@ yyreduce:
 		  lParse->Nodes[(yyval.Node)].SubNodes[ lParse->Nodes[(yyval.Node)].nSubNodes++ ]
 		     = (yyvsp[0].Node);
                 }
-#line 1942 "eval_y.c"
-    break;
-
-  case 16: /* expr: vector '}'  */
-#line 354 "eval.y"
-                { (yyval.Node) = Close_Vec(lParse,  (yyvsp[-1].Node) ); TEST((yyval.Node)); }
 #line 1948 "eval_y.c"
     break;
 
-  case 17: /* bexpr: bvector '}'  */
-#line 358 "eval.y"
+  case 16: /* expr: vector '}'  */
+#line 360 "eval.y"
                 { (yyval.Node) = Close_Vec(lParse,  (yyvsp[-1].Node) ); TEST((yyval.Node)); }
 #line 1954 "eval_y.c"
     break;
 
+  case 17: /* bexpr: bvector '}'  */
+#line 364 "eval.y"
+                { (yyval.Node) = Close_Vec(lParse,  (yyvsp[-1].Node) ); TEST((yyval.Node)); }
+#line 1960 "eval_y.c"
+    break;
+
   case 18: /* bits: BITSTR  */
-#line 362 "eval.y"
+#line 368 "eval.y"
                 {
                   (yyval.Node) = New_Const(lParse,  BITSTR, (yyvsp[0].str), strlen((yyvsp[0].str))+1 ); TEST((yyval.Node));
 		  SIZE((yyval.Node)) = strlen((yyvsp[0].str)); }
-#line 1962 "eval_y.c"
-    break;
-
-  case 19: /* bits: BITCOL  */
-#line 366 "eval.y"
-                { (yyval.Node) = New_Column(lParse,  (yyvsp[0].lng) ); TEST((yyval.Node)); }
 #line 1968 "eval_y.c"
     break;
 
+  case 19: /* bits: BITCOL  */
+#line 372 "eval.y"
+                { (yyval.Node) = New_Column(lParse,  (yyvsp[0].lng) ); TEST((yyval.Node)); }
+#line 1974 "eval_y.c"
+    break;
+
   case 20: /* bits: BITCOL '{' expr '}'  */
-#line 368 "eval.y"
+#line 374 "eval.y"
                 {
                   if( TYPE((yyvsp[-1].Node)) != LONG
 		      || OPER((yyvsp[-1].Node)) != CONST_OP ) {
@@ -1977,25 +1983,25 @@ yyreduce:
 		  }
                   (yyval.Node) = New_Offset(lParse,  (yyvsp[-3].lng), (yyvsp[-1].Node) ); TEST((yyval.Node));
                 }
-#line 1981 "eval_y.c"
+#line 1987 "eval_y.c"
     break;
 
   case 21: /* bits: bits '&' bits  */
-#line 377 "eval.y"
+#line 383 "eval.y"
                 { (yyval.Node) = New_BinOp(lParse,  BITSTR, (yyvsp[-2].Node), '&', (yyvsp[0].Node) ); TEST((yyval.Node));
                   SIZE((yyval.Node)) = ( SIZE((yyvsp[-2].Node))>SIZE((yyvsp[0].Node)) ? SIZE((yyvsp[-2].Node)) : SIZE((yyvsp[0].Node)) );  }
-#line 1988 "eval_y.c"
+#line 1994 "eval_y.c"
     break;
 
   case 22: /* bits: bits '|' bits  */
-#line 380 "eval.y"
+#line 386 "eval.y"
                 { (yyval.Node) = New_BinOp(lParse,  BITSTR, (yyvsp[-2].Node), '|', (yyvsp[0].Node) ); TEST((yyval.Node));
                   SIZE((yyval.Node)) = ( SIZE((yyvsp[-2].Node))>SIZE((yyvsp[0].Node)) ? SIZE((yyvsp[-2].Node)) : SIZE((yyvsp[0].Node)) );  }
-#line 1995 "eval_y.c"
+#line 2001 "eval_y.c"
     break;
 
   case 23: /* bits: bits '+' bits  */
-#line 383 "eval.y"
+#line 389 "eval.y"
                 { 
 		  if (SIZE((yyvsp[-2].Node))+SIZE((yyvsp[0].Node)) >= MAX_STRLEN) {
 		    yyerror(scanner, lParse, "Combined bit string size exceeds " MAX_STRLEN_S " bits");
@@ -2004,71 +2010,71 @@ yyreduce:
 		  (yyval.Node) = New_BinOp(lParse,  BITSTR, (yyvsp[-2].Node), '+', (yyvsp[0].Node) ); TEST((yyval.Node));
                   SIZE((yyval.Node)) = SIZE((yyvsp[-2].Node)) + SIZE((yyvsp[0].Node)); 
 		}
-#line 2008 "eval_y.c"
-    break;
-
-  case 24: /* bits: bits '[' expr ']'  */
-#line 392 "eval.y"
-                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-3].Node), 1, (yyvsp[-1].Node),  0,  0,  0,   0 ); TEST((yyval.Node)); }
 #line 2014 "eval_y.c"
     break;
 
-  case 25: /* bits: bits '[' expr ',' expr ']'  */
-#line 394 "eval.y"
-                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-5].Node), 2, (yyvsp[-3].Node), (yyvsp[-1].Node),  0,  0,   0 ); TEST((yyval.Node)); }
+  case 24: /* bits: bits '[' expr ']'  */
+#line 398 "eval.y"
+                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-3].Node), 1, (yyvsp[-1].Node),  0,  0,  0,   0 ); TEST((yyval.Node)); }
 #line 2020 "eval_y.c"
     break;
 
-  case 26: /* bits: bits '[' expr ',' expr ',' expr ']'  */
-#line 396 "eval.y"
-                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-7].Node), 3, (yyvsp[-5].Node), (yyvsp[-3].Node), (yyvsp[-1].Node),  0,   0 ); TEST((yyval.Node)); }
+  case 25: /* bits: bits '[' expr ',' expr ']'  */
+#line 400 "eval.y"
+                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-5].Node), 2, (yyvsp[-3].Node), (yyvsp[-1].Node),  0,  0,   0 ); TEST((yyval.Node)); }
 #line 2026 "eval_y.c"
     break;
 
-  case 27: /* bits: bits '[' expr ',' expr ',' expr ',' expr ']'  */
-#line 398 "eval.y"
-                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-9].Node), 4, (yyvsp[-7].Node), (yyvsp[-5].Node), (yyvsp[-3].Node), (yyvsp[-1].Node),   0 ); TEST((yyval.Node)); }
+  case 26: /* bits: bits '[' expr ',' expr ',' expr ']'  */
+#line 402 "eval.y"
+                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-7].Node), 3, (yyvsp[-5].Node), (yyvsp[-3].Node), (yyvsp[-1].Node),  0,   0 ); TEST((yyval.Node)); }
 #line 2032 "eval_y.c"
     break;
 
-  case 28: /* bits: bits '[' expr ',' expr ',' expr ',' expr ',' expr ']'  */
-#line 400 "eval.y"
-                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-11].Node), 5, (yyvsp[-9].Node), (yyvsp[-7].Node), (yyvsp[-5].Node), (yyvsp[-3].Node), (yyvsp[-1].Node) ); TEST((yyval.Node)); }
+  case 27: /* bits: bits '[' expr ',' expr ',' expr ',' expr ']'  */
+#line 404 "eval.y"
+                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-9].Node), 4, (yyvsp[-7].Node), (yyvsp[-5].Node), (yyvsp[-3].Node), (yyvsp[-1].Node),   0 ); TEST((yyval.Node)); }
 #line 2038 "eval_y.c"
     break;
 
-  case 29: /* bits: NOT bits  */
-#line 402 "eval.y"
-                { (yyval.Node) = New_Unary(lParse,  BITSTR, NOT, (yyvsp[0].Node) ); TEST((yyval.Node));     }
+  case 28: /* bits: bits '[' expr ',' expr ',' expr ',' expr ',' expr ']'  */
+#line 406 "eval.y"
+                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-11].Node), 5, (yyvsp[-9].Node), (yyvsp[-7].Node), (yyvsp[-5].Node), (yyvsp[-3].Node), (yyvsp[-1].Node) ); TEST((yyval.Node)); }
 #line 2044 "eval_y.c"
     break;
 
-  case 30: /* bits: '(' bits ')'  */
-#line 405 "eval.y"
-                { (yyval.Node) = (yyvsp[-1].Node); }
+  case 29: /* bits: NOT bits  */
+#line 408 "eval.y"
+                { (yyval.Node) = New_Unary(lParse,  BITSTR, NOT, (yyvsp[0].Node) ); TEST((yyval.Node));     }
 #line 2050 "eval_y.c"
     break;
 
-  case 31: /* expr: LONG  */
-#line 409 "eval.y"
-                { (yyval.Node) = New_Const(lParse,  LONG,   &((yyvsp[0].lng)), sizeof(long)   ); TEST((yyval.Node)); }
+  case 30: /* bits: '(' bits ')'  */
+#line 411 "eval.y"
+                { (yyval.Node) = (yyvsp[-1].Node); }
 #line 2056 "eval_y.c"
     break;
 
-  case 32: /* expr: DOUBLE  */
-#line 411 "eval.y"
-                { (yyval.Node) = New_Const(lParse,  DOUBLE, &((yyvsp[0].dbl)), sizeof(double) ); TEST((yyval.Node)); }
+  case 31: /* expr: LONG  */
+#line 415 "eval.y"
+                { (yyval.Node) = New_Const(lParse,  LONG,   &((yyvsp[0].lng)), sizeof(long)   ); TEST((yyval.Node)); }
 #line 2062 "eval_y.c"
     break;
 
-  case 33: /* expr: COLUMN  */
-#line 413 "eval.y"
-                { (yyval.Node) = New_Column(lParse,  (yyvsp[0].lng) ); TEST((yyval.Node)); }
+  case 32: /* expr: DOUBLE  */
+#line 417 "eval.y"
+                { (yyval.Node) = New_Const(lParse,  DOUBLE, &((yyvsp[0].dbl)), sizeof(double) ); TEST((yyval.Node)); }
 #line 2068 "eval_y.c"
     break;
 
+  case 33: /* expr: COLUMN  */
+#line 419 "eval.y"
+                { (yyval.Node) = New_Column(lParse,  (yyvsp[0].lng) ); TEST((yyval.Node)); }
+#line 2074 "eval_y.c"
+    break;
+
   case 34: /* expr: COLUMN '{' expr '}'  */
-#line 415 "eval.y"
+#line 421 "eval.y"
                 {
                   if( TYPE((yyvsp[-1].Node)) != LONG
 		      || OPER((yyvsp[-1].Node)) != CONST_OP ) {
@@ -2077,58 +2083,58 @@ yyreduce:
 		  }
                   (yyval.Node) = New_Offset(lParse,  (yyvsp[-3].lng), (yyvsp[-1].Node) ); TEST((yyval.Node));
                 }
-#line 2081 "eval_y.c"
-    break;
-
-  case 35: /* expr: ROWREF  */
-#line 424 "eval.y"
-                { (yyval.Node) = New_Func(lParse,  LONG, row_fct,  0, 0, 0, 0, 0, 0, 0, 0 ); }
 #line 2087 "eval_y.c"
     break;
 
-  case 36: /* expr: NULLREF  */
-#line 426 "eval.y"
-                { (yyval.Node) = New_Func(lParse,  LONG, null_fct, 0, 0, 0, 0, 0, 0, 0, 0 ); }
+  case 35: /* expr: ROWREF  */
+#line 430 "eval.y"
+                { (yyval.Node) = New_Func(lParse,  LONG, row_fct,  0, 0, 0, 0, 0, 0, 0, 0 ); }
 #line 2093 "eval_y.c"
     break;
 
+  case 36: /* expr: NULLREF  */
+#line 432 "eval.y"
+                { (yyval.Node) = New_Func(lParse,  LONG, null_fct, 0, 0, 0, 0, 0, 0, 0, 0 ); }
+#line 2099 "eval_y.c"
+    break;
+
   case 37: /* expr: expr '%' expr  */
-#line 428 "eval.y"
+#line 434 "eval.y"
                 { PROMOTE((yyvsp[-2].Node),(yyvsp[0].Node)); (yyval.Node) = New_BinOp(lParse,  TYPE((yyvsp[-2].Node)), (yyvsp[-2].Node), '%', (yyvsp[0].Node) );
 		  TEST((yyval.Node));                                                }
-#line 2100 "eval_y.c"
+#line 2106 "eval_y.c"
     break;
 
   case 38: /* expr: expr '+' expr  */
-#line 431 "eval.y"
+#line 437 "eval.y"
                 { PROMOTE((yyvsp[-2].Node),(yyvsp[0].Node)); (yyval.Node) = New_BinOp(lParse,  TYPE((yyvsp[-2].Node)), (yyvsp[-2].Node), '+', (yyvsp[0].Node) );
 		  TEST((yyval.Node));                                                }
-#line 2107 "eval_y.c"
+#line 2113 "eval_y.c"
     break;
 
   case 39: /* expr: expr '-' expr  */
-#line 434 "eval.y"
+#line 440 "eval.y"
                 { PROMOTE((yyvsp[-2].Node),(yyvsp[0].Node)); (yyval.Node) = New_BinOp(lParse,  TYPE((yyvsp[-2].Node)), (yyvsp[-2].Node), '-', (yyvsp[0].Node) ); 
 		  TEST((yyval.Node));                                                }
-#line 2114 "eval_y.c"
+#line 2120 "eval_y.c"
     break;
 
   case 40: /* expr: expr '*' expr  */
-#line 437 "eval.y"
+#line 443 "eval.y"
                 { PROMOTE((yyvsp[-2].Node),(yyvsp[0].Node)); (yyval.Node) = New_BinOp(lParse,  TYPE((yyvsp[-2].Node)), (yyvsp[-2].Node), '*', (yyvsp[0].Node) ); 
 		  TEST((yyval.Node));                                                }
-#line 2121 "eval_y.c"
+#line 2127 "eval_y.c"
     break;
 
   case 41: /* expr: expr '/' expr  */
-#line 440 "eval.y"
+#line 446 "eval.y"
                 { PROMOTE((yyvsp[-2].Node),(yyvsp[0].Node)); (yyval.Node) = New_BinOp(lParse,  TYPE((yyvsp[-2].Node)), (yyvsp[-2].Node), '/', (yyvsp[0].Node) ); 
 		  TEST((yyval.Node));                                                }
-#line 2128 "eval_y.c"
+#line 2134 "eval_y.c"
     break;
 
   case 42: /* expr: expr '&' expr  */
-#line 443 "eval.y"
+#line 449 "eval.y"
                 { 
                    if (TYPE((yyvsp[-2].Node)) != LONG ||
 		       TYPE((yyvsp[0].Node)) != LONG) {
@@ -2137,11 +2143,11 @@ yyreduce:
                    }
                    (yyval.Node) = New_BinOp(lParse,  TYPE((yyvsp[-2].Node)), (yyvsp[-2].Node), '&', (yyvsp[0].Node) );
                 }
-#line 2141 "eval_y.c"
+#line 2147 "eval_y.c"
     break;
 
   case 43: /* expr: expr '|' expr  */
-#line 452 "eval.y"
+#line 458 "eval.y"
                 { 
                    if (TYPE((yyvsp[-2].Node)) != LONG ||
 		       TYPE((yyvsp[0].Node)) != LONG) {
@@ -2150,11 +2156,11 @@ yyreduce:
                    }
                    (yyval.Node) = New_BinOp(lParse,  TYPE((yyvsp[-2].Node)), (yyvsp[-2].Node), '|', (yyvsp[0].Node) );
                 }
-#line 2154 "eval_y.c"
+#line 2160 "eval_y.c"
     break;
 
   case 44: /* expr: expr XOR expr  */
-#line 461 "eval.y"
+#line 467 "eval.y"
                 { 
                    if (TYPE((yyvsp[-2].Node)) != LONG ||
 		       TYPE((yyvsp[0].Node)) != LONG) {
@@ -2163,52 +2169,52 @@ yyreduce:
                    }
                    (yyval.Node) = New_BinOp(lParse,  TYPE((yyvsp[-2].Node)), (yyvsp[-2].Node), '^', (yyvsp[0].Node) );
                 }
-#line 2167 "eval_y.c"
+#line 2173 "eval_y.c"
     break;
 
   case 45: /* expr: expr POWER expr  */
-#line 470 "eval.y"
+#line 476 "eval.y"
                 { PROMOTE((yyvsp[-2].Node),(yyvsp[0].Node)); (yyval.Node) = New_BinOp(lParse,  TYPE((yyvsp[-2].Node)), (yyvsp[-2].Node), POWER, (yyvsp[0].Node) );
 		  TEST((yyval.Node));                                                }
-#line 2174 "eval_y.c"
-    break;
-
-  case 46: /* expr: '+' expr  */
-#line 473 "eval.y"
-                { (yyval.Node) = (yyvsp[0].Node); }
 #line 2180 "eval_y.c"
     break;
 
-  case 47: /* expr: '-' expr  */
-#line 475 "eval.y"
-                { (yyval.Node) = New_Unary(lParse,  TYPE((yyvsp[0].Node)), UMINUS, (yyvsp[0].Node) ); TEST((yyval.Node)); }
+  case 46: /* expr: '+' expr  */
+#line 479 "eval.y"
+                { (yyval.Node) = (yyvsp[0].Node); }
 #line 2186 "eval_y.c"
     break;
 
-  case 48: /* expr: '(' expr ')'  */
-#line 477 "eval.y"
-                { (yyval.Node) = (yyvsp[-1].Node); }
+  case 47: /* expr: '-' expr  */
+#line 481 "eval.y"
+                { (yyval.Node) = New_Unary(lParse,  TYPE((yyvsp[0].Node)), UMINUS, (yyvsp[0].Node) ); TEST((yyval.Node)); }
 #line 2192 "eval_y.c"
     break;
 
+  case 48: /* expr: '(' expr ')'  */
+#line 483 "eval.y"
+                { (yyval.Node) = (yyvsp[-1].Node); }
+#line 2198 "eval_y.c"
+    break;
+
   case 49: /* expr: expr '*' bexpr  */
-#line 479 "eval.y"
+#line 485 "eval.y"
                 { (yyvsp[0].Node) = New_Unary(lParse,  TYPE((yyvsp[-2].Node)), 0, (yyvsp[0].Node) );
                   (yyval.Node) = New_BinOp(lParse,  TYPE((yyvsp[-2].Node)), (yyvsp[-2].Node), '*', (yyvsp[0].Node) ); 
 		  TEST((yyval.Node));                                }
-#line 2200 "eval_y.c"
+#line 2206 "eval_y.c"
     break;
 
   case 50: /* expr: bexpr '*' expr  */
-#line 483 "eval.y"
+#line 489 "eval.y"
                 { (yyvsp[-2].Node) = New_Unary(lParse,  TYPE((yyvsp[0].Node)), 0, (yyvsp[-2].Node) );
                   (yyval.Node) = New_BinOp(lParse,  TYPE((yyvsp[0].Node)), (yyvsp[-2].Node), '*', (yyvsp[0].Node) );
                   TEST((yyval.Node));                                }
-#line 2208 "eval_y.c"
+#line 2214 "eval_y.c"
     break;
 
   case 51: /* expr: bexpr '?' expr ':' expr  */
-#line 487 "eval.y"
+#line 493 "eval.y"
                 {
                   PROMOTE((yyvsp[-2].Node),(yyvsp[0].Node));
                   if( ! Test_Dims( lParse, (yyvsp[-2].Node),(yyvsp[0].Node)) ) {
@@ -2227,11 +2233,11 @@ yyreduce:
                   TYPE((yyvsp[-4].Node)) = BOOLEAN;
                   if( SIZE((yyval.Node))<SIZE((yyvsp[-4].Node)) )  Copy_Dims( lParse,(yyval.Node), (yyvsp[-4].Node));
                 }
-#line 2231 "eval_y.c"
+#line 2237 "eval_y.c"
     break;
 
   case 52: /* expr: bexpr '?' bexpr ':' expr  */
-#line 506 "eval.y"
+#line 512 "eval.y"
                 {
                   PROMOTE((yyvsp[-2].Node),(yyvsp[0].Node));
                   if( ! Test_Dims( lParse, (yyvsp[-2].Node),(yyvsp[0].Node)) ) {
@@ -2250,11 +2256,11 @@ yyreduce:
                   TYPE((yyvsp[-4].Node)) = BOOLEAN;
                   if( SIZE((yyval.Node))<SIZE((yyvsp[-4].Node)) )  Copy_Dims( lParse,(yyval.Node), (yyvsp[-4].Node));
                 }
-#line 2254 "eval_y.c"
+#line 2260 "eval_y.c"
     break;
 
   case 53: /* expr: bexpr '?' expr ':' bexpr  */
-#line 525 "eval.y"
+#line 531 "eval.y"
                 {
                   PROMOTE((yyvsp[-2].Node),(yyvsp[0].Node));
                   if( ! Test_Dims( lParse, (yyvsp[-2].Node),(yyvsp[0].Node)) ) {
@@ -2273,11 +2279,11 @@ yyreduce:
                   TYPE((yyvsp[-4].Node)) = BOOLEAN;
                   if( SIZE((yyval.Node))<SIZE((yyvsp[-4].Node)) )  Copy_Dims( lParse,(yyval.Node), (yyvsp[-4].Node));
                 }
-#line 2277 "eval_y.c"
+#line 2283 "eval_y.c"
     break;
 
   case 54: /* expr: FUNCTION ')'  */
-#line 544 "eval.y"
+#line 550 "eval.y"
                 { if (FSTRCMP((yyvsp[-1].str),"RANDOM(") == 0) {  /* Scalar RANDOM() */
                      (yyval.Node) = New_Func(lParse,  DOUBLE, rnd_fct, 0, 0, 0, 0, 0, 0, 0, 0 );
 		  } else if (FSTRCMP((yyvsp[-1].str),"RANDOMN(") == 0) {/*Scalar RANDOMN()*/
@@ -2288,11 +2294,11 @@ yyreduce:
 		  }
                   TEST((yyval.Node)); 
                 }
-#line 2292 "eval_y.c"
+#line 2298 "eval_y.c"
     break;
 
   case 55: /* expr: FUNCTION bexpr ')'  */
-#line 555 "eval.y"
+#line 561 "eval.y"
                 { if (FSTRCMP((yyvsp[-2].str),"SUM(") == 0) {
 		     (yyval.Node) = New_Func(lParse,  LONG, sum_fct, 1, (yyvsp[-1].Node), 0, 0, 0, 0, 0, 0 );
                   } else if (FSTRCMP((yyvsp[-2].str),"NELEM(") == 0) {
@@ -2306,11 +2312,11 @@ yyreduce:
 		  }
                   TEST((yyval.Node)); 
 		}
-#line 2310 "eval_y.c"
+#line 2316 "eval_y.c"
     break;
 
   case 56: /* expr: FUNCTION bexpr ',' expr ')'  */
-#line 569 "eval.y"
+#line 575 "eval.y"
                 { if (FSTRCMP((yyvsp[-4].str),"AXISELEM(") == 0) {  /* AXISELEM(V,n) */
 		     if (OPER((yyvsp[-1].Node)) != CONST_OP
 			 || SIZE((yyvsp[-1].Node)) != 1) {
@@ -2359,11 +2365,11 @@ yyreduce:
 		  }
                   TEST((yyval.Node)); 
 		}
-#line 2363 "eval_y.c"
+#line 2369 "eval_y.c"
     break;
 
   case 57: /* expr: FUNCTION sexpr ')'  */
-#line 618 "eval.y"
+#line 624 "eval.y"
                 { if (FSTRCMP((yyvsp[-2].str),"NELEM(") == 0) {
                      (yyval.Node) = New_Const(lParse,  LONG, &( SIZE((yyvsp[-1].Node)) ), sizeof(long) );
 		  } else if (FSTRCMP((yyvsp[-2].str),"NVALID(") == 0) {
@@ -2375,11 +2381,11 @@ yyreduce:
 		  }
                   TEST((yyval.Node)); 
 		}
-#line 2379 "eval_y.c"
+#line 2385 "eval_y.c"
     break;
 
   case 58: /* expr: FUNCTION bits ')'  */
-#line 630 "eval.y"
+#line 636 "eval.y"
                 { if (FSTRCMP((yyvsp[-2].str),"NELEM(") == 0) {
                      (yyval.Node) = New_Const(lParse,  LONG, &( SIZE((yyvsp[-1].Node)) ), sizeof(long) );
 		} else if (FSTRCMP((yyvsp[-2].str),"NVALID(") == 0) { /* Bit arrays do not have NULL */
@@ -2410,11 +2416,11 @@ yyreduce:
 		  }
                   TEST((yyval.Node)); 
 		}
-#line 2414 "eval_y.c"
+#line 2420 "eval_y.c"
     break;
 
   case 59: /* expr: FUNCTION expr ')'  */
-#line 661 "eval.y"
+#line 667 "eval.y"
                 { if (FSTRCMP((yyvsp[-2].str),"SUM(") == 0)
 		     (yyval.Node) = New_Func(lParse,  TYPE((yyvsp[-1].Node)), sum_fct, 1, (yyvsp[-1].Node),
 				    0, 0, 0, 0, 0, 0 );
@@ -2528,11 +2534,11 @@ yyreduce:
 		  }
                   TEST((yyval.Node)); 
                 }
-#line 2532 "eval_y.c"
+#line 2538 "eval_y.c"
     break;
 
   case 60: /* expr: IFUNCTION sexpr ',' sexpr ')'  */
-#line 775 "eval.y"
+#line 781 "eval.y"
                 { 
 		  if (FSTRCMP((yyvsp[-4].str),"STRSTR(") == 0) {
 		    (yyval.Node) = New_Func(lParse,  LONG, strpos_fct, 2, (yyvsp[-3].Node), (yyvsp[-1].Node), 0, 
@@ -2540,11 +2546,11 @@ yyreduce:
 		    TEST((yyval.Node));
 		  }
                 }
-#line 2544 "eval_y.c"
+#line 2550 "eval_y.c"
     break;
 
   case 61: /* expr: FUNCTION expr ',' expr ')'  */
-#line 783 "eval.y"
+#line 789 "eval.y"
                 { 
 		   if (FSTRCMP((yyvsp[-4].str),"DEFNULL(") == 0) {
 		      if( SIZE((yyvsp[-3].Node))>=SIZE((yyvsp[-1].Node)) && Test_Dims( lParse,  (yyvsp[-3].Node), (yyvsp[-1].Node) ) ) {
@@ -2647,11 +2653,11 @@ yyreduce:
 		      YYERROR;
 		   }
                 }
-#line 2651 "eval_y.c"
+#line 2657 "eval_y.c"
     break;
 
   case 62: /* expr: FUNCTION expr ',' expr ',' expr ',' expr ')'  */
-#line 886 "eval.y"
+#line 892 "eval.y"
                 { 
 		  if (FSTRCMP((yyvsp[-8].str),"ANGSEP(") == 0) {
 		    if( TYPE((yyvsp[-7].Node)) != DOUBLE ) (yyvsp[-7].Node) = New_Unary(lParse,  DOUBLE, 0, (yyvsp[-7].Node) );
@@ -2675,91 +2681,91 @@ yyreduce:
 		      YYERROR;
 		   }
                 }
-#line 2679 "eval_y.c"
+#line 2685 "eval_y.c"
     break;
 
   case 63: /* expr: GTIOVERLAP STRING ',' expr ',' expr ')'  */
-#line 912 "eval.y"
+#line 918 "eval.y"
                 {  (yyval.Node) = New_GTI(lParse, gtiover_fct,  (yyvsp[-5].str), (yyvsp[-3].Node), (yyvsp[-1].Node), "*START*", "*STOP*");
                    TEST((yyval.Node));                                        }
-#line 2686 "eval_y.c"
+#line 2692 "eval_y.c"
     break;
 
   case 64: /* expr: GTIOVERLAP STRING ',' expr ',' expr ',' STRING ',' STRING ')'  */
-#line 915 "eval.y"
+#line 921 "eval.y"
                 {  (yyval.Node) = New_GTI(lParse, gtiover_fct,  (yyvsp[-9].str), (yyvsp[-7].Node), (yyvsp[-5].Node), (yyvsp[-3].str), (yyvsp[-1].str) );
                    TEST((yyval.Node));                                        }
-#line 2693 "eval_y.c"
-    break;
-
-  case 65: /* expr: expr '[' expr ']'  */
-#line 919 "eval.y"
-                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-3].Node), 1, (yyvsp[-1].Node),  0,  0,  0,   0 ); TEST((yyval.Node)); }
 #line 2699 "eval_y.c"
     break;
 
-  case 66: /* expr: expr '[' expr ',' expr ']'  */
-#line 921 "eval.y"
-                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-5].Node), 2, (yyvsp[-3].Node), (yyvsp[-1].Node),  0,  0,   0 ); TEST((yyval.Node)); }
+  case 65: /* expr: expr '[' expr ']'  */
+#line 925 "eval.y"
+                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-3].Node), 1, (yyvsp[-1].Node),  0,  0,  0,   0 ); TEST((yyval.Node)); }
 #line 2705 "eval_y.c"
     break;
 
-  case 67: /* expr: expr '[' expr ',' expr ',' expr ']'  */
-#line 923 "eval.y"
-                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-7].Node), 3, (yyvsp[-5].Node), (yyvsp[-3].Node), (yyvsp[-1].Node),  0,   0 ); TEST((yyval.Node)); }
+  case 66: /* expr: expr '[' expr ',' expr ']'  */
+#line 927 "eval.y"
+                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-5].Node), 2, (yyvsp[-3].Node), (yyvsp[-1].Node),  0,  0,   0 ); TEST((yyval.Node)); }
 #line 2711 "eval_y.c"
     break;
 
-  case 68: /* expr: expr '[' expr ',' expr ',' expr ',' expr ']'  */
-#line 925 "eval.y"
-                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-9].Node), 4, (yyvsp[-7].Node), (yyvsp[-5].Node), (yyvsp[-3].Node), (yyvsp[-1].Node),   0 ); TEST((yyval.Node)); }
+  case 67: /* expr: expr '[' expr ',' expr ',' expr ']'  */
+#line 929 "eval.y"
+                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-7].Node), 3, (yyvsp[-5].Node), (yyvsp[-3].Node), (yyvsp[-1].Node),  0,   0 ); TEST((yyval.Node)); }
 #line 2717 "eval_y.c"
     break;
 
-  case 69: /* expr: expr '[' expr ',' expr ',' expr ',' expr ',' expr ']'  */
-#line 927 "eval.y"
-                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-11].Node), 5, (yyvsp[-9].Node), (yyvsp[-7].Node), (yyvsp[-5].Node), (yyvsp[-3].Node), (yyvsp[-1].Node) ); TEST((yyval.Node)); }
+  case 68: /* expr: expr '[' expr ',' expr ',' expr ',' expr ']'  */
+#line 931 "eval.y"
+                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-9].Node), 4, (yyvsp[-7].Node), (yyvsp[-5].Node), (yyvsp[-3].Node), (yyvsp[-1].Node),   0 ); TEST((yyval.Node)); }
 #line 2723 "eval_y.c"
     break;
 
-  case 70: /* expr: INTCAST expr  */
-#line 929 "eval.y"
-                { (yyval.Node) = New_Unary(lParse,  LONG,   INTCAST, (yyvsp[0].Node) );  TEST((yyval.Node));  }
+  case 69: /* expr: expr '[' expr ',' expr ',' expr ',' expr ',' expr ']'  */
+#line 933 "eval.y"
+                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-11].Node), 5, (yyvsp[-9].Node), (yyvsp[-7].Node), (yyvsp[-5].Node), (yyvsp[-3].Node), (yyvsp[-1].Node) ); TEST((yyval.Node)); }
 #line 2729 "eval_y.c"
     break;
 
-  case 71: /* expr: INTCAST bexpr  */
-#line 931 "eval.y"
+  case 70: /* expr: INTCAST expr  */
+#line 935 "eval.y"
                 { (yyval.Node) = New_Unary(lParse,  LONG,   INTCAST, (yyvsp[0].Node) );  TEST((yyval.Node));  }
 #line 2735 "eval_y.c"
     break;
 
-  case 72: /* expr: FLTCAST expr  */
-#line 933 "eval.y"
-                { (yyval.Node) = New_Unary(lParse,  DOUBLE, FLTCAST, (yyvsp[0].Node) );  TEST((yyval.Node));  }
+  case 71: /* expr: INTCAST bexpr  */
+#line 937 "eval.y"
+                { (yyval.Node) = New_Unary(lParse,  LONG,   INTCAST, (yyvsp[0].Node) );  TEST((yyval.Node));  }
 #line 2741 "eval_y.c"
     break;
 
-  case 73: /* expr: FLTCAST bexpr  */
-#line 935 "eval.y"
+  case 72: /* expr: FLTCAST expr  */
+#line 939 "eval.y"
                 { (yyval.Node) = New_Unary(lParse,  DOUBLE, FLTCAST, (yyvsp[0].Node) );  TEST((yyval.Node));  }
 #line 2747 "eval_y.c"
     break;
 
-  case 74: /* bexpr: BOOLEAN  */
-#line 939 "eval.y"
-                { (yyval.Node) = New_Const(lParse,  BOOLEAN, &((yyvsp[0].log)), sizeof(char) ); TEST((yyval.Node)); }
+  case 73: /* expr: FLTCAST bexpr  */
+#line 941 "eval.y"
+                { (yyval.Node) = New_Unary(lParse,  DOUBLE, FLTCAST, (yyvsp[0].Node) );  TEST((yyval.Node));  }
 #line 2753 "eval_y.c"
     break;
 
-  case 75: /* bexpr: BCOLUMN  */
-#line 941 "eval.y"
-                { (yyval.Node) = New_Column(lParse,  (yyvsp[0].lng) ); TEST((yyval.Node)); }
+  case 74: /* bexpr: BOOLEAN  */
+#line 945 "eval.y"
+                { (yyval.Node) = New_Const(lParse,  BOOLEAN, &((yyvsp[0].log)), sizeof(char) ); TEST((yyval.Node)); }
 #line 2759 "eval_y.c"
     break;
 
+  case 75: /* bexpr: BCOLUMN  */
+#line 947 "eval.y"
+                { (yyval.Node) = New_Column(lParse,  (yyvsp[0].lng) ); TEST((yyval.Node)); }
+#line 2765 "eval_y.c"
+    break;
+
   case 76: /* bexpr: BCOLUMN '{' expr '}'  */
-#line 943 "eval.y"
+#line 949 "eval.y"
                 {
                   if( TYPE((yyvsp[-1].Node)) != LONG
 		      || OPER((yyvsp[-1].Node)) != CONST_OP ) {
@@ -2768,178 +2774,178 @@ yyreduce:
 		  }
                   (yyval.Node) = New_Offset(lParse,  (yyvsp[-3].lng), (yyvsp[-1].Node) ); TEST((yyval.Node));
                 }
-#line 2772 "eval_y.c"
+#line 2778 "eval_y.c"
     break;
 
   case 77: /* bexpr: bits EQ bits  */
-#line 952 "eval.y"
+#line 958 "eval.y"
                 { (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), EQ,  (yyvsp[0].Node) ); TEST((yyval.Node));
 		  SIZE((yyval.Node)) = 1;                                     }
-#line 2779 "eval_y.c"
+#line 2785 "eval_y.c"
     break;
 
   case 78: /* bexpr: bits NE bits  */
-#line 955 "eval.y"
+#line 961 "eval.y"
                 { (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), NE,  (yyvsp[0].Node) ); TEST((yyval.Node)); 
 		  SIZE((yyval.Node)) = 1;                                     }
-#line 2786 "eval_y.c"
+#line 2792 "eval_y.c"
     break;
 
   case 79: /* bexpr: bits LT bits  */
-#line 958 "eval.y"
+#line 964 "eval.y"
                 { (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), LT,  (yyvsp[0].Node) ); TEST((yyval.Node)); 
 		  SIZE((yyval.Node)) = 1;                                     }
-#line 2793 "eval_y.c"
+#line 2799 "eval_y.c"
     break;
 
   case 80: /* bexpr: bits LTE bits  */
-#line 961 "eval.y"
+#line 967 "eval.y"
                 { (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), LTE, (yyvsp[0].Node) ); TEST((yyval.Node)); 
 		  SIZE((yyval.Node)) = 1;                                     }
-#line 2800 "eval_y.c"
+#line 2806 "eval_y.c"
     break;
 
   case 81: /* bexpr: bits GT bits  */
-#line 964 "eval.y"
+#line 970 "eval.y"
                 { (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), GT,  (yyvsp[0].Node) ); TEST((yyval.Node)); 
 		  SIZE((yyval.Node)) = 1;                                     }
-#line 2807 "eval_y.c"
+#line 2813 "eval_y.c"
     break;
 
   case 82: /* bexpr: bits GTE bits  */
-#line 967 "eval.y"
+#line 973 "eval.y"
                 { (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), GTE, (yyvsp[0].Node) ); TEST((yyval.Node)); 
 		  SIZE((yyval.Node)) = 1;                                     }
-#line 2814 "eval_y.c"
+#line 2820 "eval_y.c"
     break;
 
   case 83: /* bexpr: expr GT expr  */
-#line 970 "eval.y"
+#line 976 "eval.y"
                 { PROMOTE((yyvsp[-2].Node),(yyvsp[0].Node)); (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), GT,  (yyvsp[0].Node) );
                   TEST((yyval.Node));                                               }
-#line 2821 "eval_y.c"
+#line 2827 "eval_y.c"
     break;
 
   case 84: /* bexpr: expr LT expr  */
-#line 973 "eval.y"
+#line 979 "eval.y"
                 { PROMOTE((yyvsp[-2].Node),(yyvsp[0].Node)); (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), LT,  (yyvsp[0].Node) );
                   TEST((yyval.Node));                                               }
-#line 2828 "eval_y.c"
+#line 2834 "eval_y.c"
     break;
 
   case 85: /* bexpr: expr GTE expr  */
-#line 976 "eval.y"
+#line 982 "eval.y"
                 { PROMOTE((yyvsp[-2].Node),(yyvsp[0].Node)); (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), GTE, (yyvsp[0].Node) );
                   TEST((yyval.Node));                                               }
-#line 2835 "eval_y.c"
+#line 2841 "eval_y.c"
     break;
 
   case 86: /* bexpr: expr LTE expr  */
-#line 979 "eval.y"
+#line 985 "eval.y"
                 { PROMOTE((yyvsp[-2].Node),(yyvsp[0].Node)); (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), LTE, (yyvsp[0].Node) );
                   TEST((yyval.Node));                                               }
-#line 2842 "eval_y.c"
+#line 2848 "eval_y.c"
     break;
 
   case 87: /* bexpr: expr '~' expr  */
-#line 982 "eval.y"
+#line 988 "eval.y"
                 { PROMOTE((yyvsp[-2].Node),(yyvsp[0].Node)); (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), '~', (yyvsp[0].Node) );
                   TEST((yyval.Node));                                               }
-#line 2849 "eval_y.c"
+#line 2855 "eval_y.c"
     break;
 
   case 88: /* bexpr: expr EQ expr  */
-#line 985 "eval.y"
+#line 991 "eval.y"
                 { PROMOTE((yyvsp[-2].Node),(yyvsp[0].Node)); (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), EQ,  (yyvsp[0].Node) );
                   TEST((yyval.Node));                                               }
-#line 2856 "eval_y.c"
+#line 2862 "eval_y.c"
     break;
 
   case 89: /* bexpr: expr NE expr  */
-#line 988 "eval.y"
+#line 994 "eval.y"
                 { PROMOTE((yyvsp[-2].Node),(yyvsp[0].Node)); (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), NE,  (yyvsp[0].Node) );
                   TEST((yyval.Node));                                               }
-#line 2863 "eval_y.c"
+#line 2869 "eval_y.c"
     break;
 
   case 90: /* bexpr: sexpr EQ sexpr  */
-#line 991 "eval.y"
+#line 997 "eval.y"
                 { (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), EQ,  (yyvsp[0].Node) ); TEST((yyval.Node));
                   SIZE((yyval.Node)) = 1; }
-#line 2870 "eval_y.c"
+#line 2876 "eval_y.c"
     break;
 
   case 91: /* bexpr: sexpr NE sexpr  */
-#line 994 "eval.y"
+#line 1000 "eval.y"
                 { (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), NE,  (yyvsp[0].Node) ); TEST((yyval.Node));
                   SIZE((yyval.Node)) = 1; }
-#line 2877 "eval_y.c"
+#line 2883 "eval_y.c"
     break;
 
   case 92: /* bexpr: sexpr GT sexpr  */
-#line 997 "eval.y"
+#line 1003 "eval.y"
                 { (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), GT,  (yyvsp[0].Node) ); TEST((yyval.Node));
                   SIZE((yyval.Node)) = 1; }
-#line 2884 "eval_y.c"
+#line 2890 "eval_y.c"
     break;
 
   case 93: /* bexpr: sexpr GTE sexpr  */
-#line 1000 "eval.y"
+#line 1006 "eval.y"
                 { (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), GTE, (yyvsp[0].Node) ); TEST((yyval.Node));
                   SIZE((yyval.Node)) = 1; }
-#line 2891 "eval_y.c"
+#line 2897 "eval_y.c"
     break;
 
   case 94: /* bexpr: sexpr LT sexpr  */
-#line 1003 "eval.y"
+#line 1009 "eval.y"
                 { (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), LT,  (yyvsp[0].Node) ); TEST((yyval.Node));
                   SIZE((yyval.Node)) = 1; }
-#line 2898 "eval_y.c"
+#line 2904 "eval_y.c"
     break;
 
   case 95: /* bexpr: sexpr LTE sexpr  */
-#line 1006 "eval.y"
+#line 1012 "eval.y"
                 { (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), LTE, (yyvsp[0].Node) ); TEST((yyval.Node));
                   SIZE((yyval.Node)) = 1; }
-#line 2905 "eval_y.c"
-    break;
-
-  case 96: /* bexpr: bexpr AND bexpr  */
-#line 1009 "eval.y"
-                { (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), AND, (yyvsp[0].Node) ); TEST((yyval.Node)); }
 #line 2911 "eval_y.c"
     break;
 
-  case 97: /* bexpr: bexpr OR bexpr  */
-#line 1011 "eval.y"
-                { (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), OR,  (yyvsp[0].Node) ); TEST((yyval.Node)); }
+  case 96: /* bexpr: bexpr AND bexpr  */
+#line 1015 "eval.y"
+                { (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), AND, (yyvsp[0].Node) ); TEST((yyval.Node)); }
 #line 2917 "eval_y.c"
     break;
 
-  case 98: /* bexpr: bexpr EQ bexpr  */
-#line 1013 "eval.y"
-                { (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), EQ,  (yyvsp[0].Node) ); TEST((yyval.Node)); }
+  case 97: /* bexpr: bexpr OR bexpr  */
+#line 1017 "eval.y"
+                { (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), OR,  (yyvsp[0].Node) ); TEST((yyval.Node)); }
 #line 2923 "eval_y.c"
     break;
 
-  case 99: /* bexpr: bexpr NE bexpr  */
-#line 1015 "eval.y"
-                { (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), NE,  (yyvsp[0].Node) ); TEST((yyval.Node)); }
+  case 98: /* bexpr: bexpr EQ bexpr  */
+#line 1019 "eval.y"
+                { (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), EQ,  (yyvsp[0].Node) ); TEST((yyval.Node)); }
 #line 2929 "eval_y.c"
     break;
 
+  case 99: /* bexpr: bexpr NE bexpr  */
+#line 1021 "eval.y"
+                { (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), NE,  (yyvsp[0].Node) ); TEST((yyval.Node)); }
+#line 2935 "eval_y.c"
+    break;
+
   case 100: /* bexpr: expr '=' expr ':' expr  */
-#line 1018 "eval.y"
+#line 1024 "eval.y"
                 { PROMOTE((yyvsp[-4].Node),(yyvsp[-2].Node)); PROMOTE((yyvsp[-4].Node),(yyvsp[0].Node)); PROMOTE((yyvsp[-2].Node),(yyvsp[0].Node));
 		  (yyvsp[-2].Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), LTE, (yyvsp[-4].Node) );
                   (yyvsp[0].Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-4].Node), LTE, (yyvsp[0].Node) );
                   (yyval.Node) = New_BinOp(lParse,  BOOLEAN, (yyvsp[-2].Node), AND, (yyvsp[0].Node) );
                   TEST((yyval.Node));                                         }
-#line 2939 "eval_y.c"
+#line 2945 "eval_y.c"
     break;
 
   case 101: /* bexpr: bexpr '?' bexpr ':' bexpr  */
-#line 1025 "eval.y"
+#line 1031 "eval.y"
                 {
                   if( ! Test_Dims( lParse, (yyvsp[-2].Node),(yyvsp[0].Node)) ) {
                      yyerror(scanner, lParse, "Incompatible dimensions in '?:' arguments");
@@ -2955,11 +2961,11 @@ yyreduce:
                   }
                   if( SIZE((yyval.Node))<SIZE((yyvsp[-4].Node)) )  Copy_Dims( lParse,(yyval.Node), (yyvsp[-4].Node));
                 }
-#line 2959 "eval_y.c"
+#line 2965 "eval_y.c"
     break;
 
   case 102: /* bexpr: BFUNCTION expr ')'  */
-#line 1042 "eval.y"
+#line 1048 "eval.y"
                 {
 		   if (FSTRCMP((yyvsp[-2].str),"ISNULL(") == 0) {
 		      (yyval.Node) = New_Func(lParse,  0, isnull_fct, 1, (yyvsp[-1].Node), 0, 0,
@@ -2972,11 +2978,11 @@ yyreduce:
 		      YYERROR;
 		   }
 		}
-#line 2976 "eval_y.c"
+#line 2982 "eval_y.c"
     break;
 
   case 103: /* bexpr: BFUNCTION bexpr ')'  */
-#line 1055 "eval.y"
+#line 1061 "eval.y"
                 {
 		   if (FSTRCMP((yyvsp[-2].str),"ISNULL(") == 0) {
 		      (yyval.Node) = New_Func(lParse,  0, isnull_fct, 1, (yyvsp[-1].Node), 0, 0,
@@ -2989,11 +2995,11 @@ yyreduce:
 		      YYERROR;
 		   }
 		}
-#line 2993 "eval_y.c"
+#line 2999 "eval_y.c"
     break;
 
   case 104: /* bexpr: BFUNCTION sexpr ')'  */
-#line 1068 "eval.y"
+#line 1074 "eval.y"
                 {
 		   if (FSTRCMP((yyvsp[-2].str),"ISNULL(") == 0) {
 		      (yyval.Node) = New_Func(lParse,  BOOLEAN, isnull_fct, 1, (yyvsp[-1].Node), 0, 0,
@@ -3004,11 +3010,11 @@ yyreduce:
 		      YYERROR;
 		   }
 		}
-#line 3008 "eval_y.c"
+#line 3014 "eval_y.c"
     break;
 
   case 105: /* bexpr: FUNCTION bexpr ',' bexpr ')'  */
-#line 1079 "eval.y"
+#line 1085 "eval.y"
                 {
 		   if (FSTRCMP((yyvsp[-4].str),"DEFNULL(") == 0) {
 		      if( SIZE((yyvsp[-3].Node))>=SIZE((yyvsp[-1].Node)) && Test_Dims( lParse,  (yyvsp[-3].Node), (yyvsp[-1].Node) ) ) {
@@ -3024,11 +3030,11 @@ yyreduce:
 		      YYERROR;
 		   }
 		}
-#line 3028 "eval_y.c"
+#line 3034 "eval_y.c"
     break;
 
   case 106: /* bexpr: BFUNCTION expr ',' expr ',' expr ')'  */
-#line 1095 "eval.y"
+#line 1101 "eval.y"
                 {
 		   if( TYPE((yyvsp[-5].Node)) != DOUBLE ) (yyvsp[-5].Node) = New_Unary(lParse,  DOUBLE, 0, (yyvsp[-5].Node) );
 		   if( TYPE((yyvsp[-3].Node)) != DOUBLE ) (yyvsp[-3].Node) = New_Unary(lParse,  DOUBLE, 0, (yyvsp[-3].Node) );
@@ -3052,11 +3058,11 @@ yyreduce:
 		     if( SIZE((yyvsp[-3].Node))<SIZE((yyvsp[-1].Node)) )  Copy_Dims( lParse,(yyval.Node), (yyvsp[-1].Node));
 		   }
 		}
-#line 3056 "eval_y.c"
+#line 3062 "eval_y.c"
     break;
 
   case 107: /* bexpr: BFUNCTION expr ',' expr ',' expr ',' expr ',' expr ')'  */
-#line 1119 "eval.y"
+#line 1125 "eval.y"
                 {
 		   if( TYPE((yyvsp[-9].Node)) != DOUBLE ) (yyvsp[-9].Node) = New_Unary(lParse,  DOUBLE, 0, (yyvsp[-9].Node) );
 		   if( TYPE((yyvsp[-7].Node)) != DOUBLE ) (yyvsp[-7].Node) = New_Unary(lParse,  DOUBLE, 0, (yyvsp[-7].Node) );
@@ -3084,11 +3090,11 @@ yyreduce:
 		     if( SIZE((yyvsp[-3].Node))<SIZE((yyvsp[-1].Node)) ) Copy_Dims( lParse,(yyval.Node), (yyvsp[-1].Node));
 		   }
 		}
-#line 3088 "eval_y.c"
+#line 3094 "eval_y.c"
     break;
 
   case 108: /* bexpr: BFUNCTION expr ',' expr ',' expr ',' expr ',' expr ',' expr ',' expr ')'  */
-#line 1147 "eval.y"
+#line 1153 "eval.y"
                 {
 		   if( TYPE((yyvsp[-13].Node)) != DOUBLE ) (yyvsp[-13].Node) = New_Unary(lParse,  DOUBLE, 0, (yyvsp[-13].Node) );
 		   if( TYPE((yyvsp[-11].Node)) != DOUBLE ) (yyvsp[-11].Node) = New_Unary(lParse,  DOUBLE, 0, (yyvsp[-11].Node) );
@@ -3124,148 +3130,148 @@ yyreduce:
 		     if( SIZE((yyvsp[-3].Node))<SIZE((yyvsp[-1].Node)) ) Copy_Dims( lParse,(yyval.Node), (yyvsp[-1].Node));
 		   }
 		}
-#line 3128 "eval_y.c"
+#line 3134 "eval_y.c"
     break;
 
   case 109: /* bexpr: GTIFILTER ')'  */
-#line 1184 "eval.y"
+#line 1190 "eval.y"
                 { /* Use defaults for all elements */
 		   (yyval.Node) = New_GTI(lParse, gtifilt_fct,  "", -99, -99, "*START*", "*STOP*" );
                    TEST((yyval.Node));                                        }
-#line 3136 "eval_y.c"
+#line 3142 "eval_y.c"
     break;
 
   case 110: /* bexpr: GTIFILTER STRING ')'  */
-#line 1188 "eval.y"
+#line 1194 "eval.y"
                 { /* Use defaults for all except filename */
 		  (yyval.Node) = New_GTI(lParse, gtifilt_fct,  (yyvsp[-1].str), -99, -99, "*START*", "*STOP*" );
                    TEST((yyval.Node));                                        }
-#line 3144 "eval_y.c"
+#line 3150 "eval_y.c"
     break;
 
   case 111: /* bexpr: GTIFILTER STRING ',' expr ')'  */
-#line 1192 "eval.y"
+#line 1198 "eval.y"
                 {  (yyval.Node) = New_GTI(lParse, gtifilt_fct,  (yyvsp[-3].str), (yyvsp[-1].Node), -99, "*START*", "*STOP*" );
                    TEST((yyval.Node));                                        }
-#line 3151 "eval_y.c"
+#line 3157 "eval_y.c"
     break;
 
   case 112: /* bexpr: GTIFILTER STRING ',' expr ',' STRING ',' STRING ')'  */
-#line 1195 "eval.y"
+#line 1201 "eval.y"
                 {  (yyval.Node) = New_GTI(lParse, gtifilt_fct,  (yyvsp[-7].str), (yyvsp[-5].Node), -99, (yyvsp[-3].str), (yyvsp[-1].str) );
                    TEST((yyval.Node));                                        }
-#line 3158 "eval_y.c"
+#line 3164 "eval_y.c"
     break;
 
   case 113: /* bexpr: GTIFIND ')'  */
-#line 1201 "eval.y"
+#line 1207 "eval.y"
                 { /* Use defaults for all elements */
 		   (yyval.Node) = New_GTI(lParse, gtifind_fct,  "", -99, -99, "*START*", "*STOP*" );
                    TEST((yyval.Node));                                        }
-#line 3166 "eval_y.c"
+#line 3172 "eval_y.c"
     break;
 
   case 114: /* bexpr: GTIFIND STRING ')'  */
-#line 1205 "eval.y"
+#line 1211 "eval.y"
                 { /* Use defaults for all except filename */
 		  (yyval.Node) = New_GTI(lParse, gtifind_fct,  (yyvsp[-1].str), -99, -99, "*START*", "*STOP*" );
                    TEST((yyval.Node));                                        }
-#line 3174 "eval_y.c"
+#line 3180 "eval_y.c"
     break;
 
   case 115: /* bexpr: GTIFIND STRING ',' expr ')'  */
-#line 1209 "eval.y"
+#line 1215 "eval.y"
                 {  (yyval.Node) = New_GTI(lParse, gtifind_fct,  (yyvsp[-3].str), (yyvsp[-1].Node), -99, "*START*", "*STOP*" );
                    TEST((yyval.Node));                                        }
-#line 3181 "eval_y.c"
+#line 3187 "eval_y.c"
     break;
 
   case 116: /* bexpr: GTIFIND STRING ',' expr ',' STRING ',' STRING ')'  */
-#line 1212 "eval.y"
+#line 1218 "eval.y"
                 {  (yyval.Node) = New_GTI(lParse, gtifind_fct,  (yyvsp[-7].str), (yyvsp[-5].Node), -99, (yyvsp[-3].str), (yyvsp[-1].str) );
                    TEST((yyval.Node));                                        }
-#line 3188 "eval_y.c"
+#line 3194 "eval_y.c"
     break;
 
   case 117: /* bexpr: REGFILTER STRING ')'  */
-#line 1217 "eval.y"
+#line 1223 "eval.y"
                 { /* Use defaults for all except filename */
                    (yyval.Node) = New_REG(lParse,  (yyvsp[-1].str), -99, -99, "" );
                    TEST((yyval.Node));                                        }
-#line 3196 "eval_y.c"
+#line 3202 "eval_y.c"
     break;
 
   case 118: /* bexpr: REGFILTER STRING ',' expr ',' expr ')'  */
-#line 1221 "eval.y"
+#line 1227 "eval.y"
                 {  (yyval.Node) = New_REG(lParse,  (yyvsp[-5].str), (yyvsp[-3].Node), (yyvsp[-1].Node), "" );
                    TEST((yyval.Node));                                        }
-#line 3203 "eval_y.c"
+#line 3209 "eval_y.c"
     break;
 
   case 119: /* bexpr: REGFILTER STRING ',' expr ',' expr ',' STRING ')'  */
-#line 1224 "eval.y"
+#line 1230 "eval.y"
                 {  (yyval.Node) = New_REG(lParse,  (yyvsp[-7].str), (yyvsp[-5].Node), (yyvsp[-3].Node), (yyvsp[-1].str) );
                    TEST((yyval.Node));                                        }
-#line 3210 "eval_y.c"
-    break;
-
-  case 120: /* bexpr: bexpr '[' expr ']'  */
-#line 1228 "eval.y"
-                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-3].Node), 1, (yyvsp[-1].Node),  0,  0,  0,   0 ); TEST((yyval.Node)); }
 #line 3216 "eval_y.c"
     break;
 
-  case 121: /* bexpr: bexpr '[' expr ',' expr ']'  */
-#line 1230 "eval.y"
-                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-5].Node), 2, (yyvsp[-3].Node), (yyvsp[-1].Node),  0,  0,   0 ); TEST((yyval.Node)); }
+  case 120: /* bexpr: bexpr '[' expr ']'  */
+#line 1234 "eval.y"
+                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-3].Node), 1, (yyvsp[-1].Node),  0,  0,  0,   0 ); TEST((yyval.Node)); }
 #line 3222 "eval_y.c"
     break;
 
-  case 122: /* bexpr: bexpr '[' expr ',' expr ',' expr ']'  */
-#line 1232 "eval.y"
-                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-7].Node), 3, (yyvsp[-5].Node), (yyvsp[-3].Node), (yyvsp[-1].Node),  0,   0 ); TEST((yyval.Node)); }
+  case 121: /* bexpr: bexpr '[' expr ',' expr ']'  */
+#line 1236 "eval.y"
+                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-5].Node), 2, (yyvsp[-3].Node), (yyvsp[-1].Node),  0,  0,   0 ); TEST((yyval.Node)); }
 #line 3228 "eval_y.c"
     break;
 
-  case 123: /* bexpr: bexpr '[' expr ',' expr ',' expr ',' expr ']'  */
-#line 1234 "eval.y"
-                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-9].Node), 4, (yyvsp[-7].Node), (yyvsp[-5].Node), (yyvsp[-3].Node), (yyvsp[-1].Node),   0 ); TEST((yyval.Node)); }
+  case 122: /* bexpr: bexpr '[' expr ',' expr ',' expr ']'  */
+#line 1238 "eval.y"
+                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-7].Node), 3, (yyvsp[-5].Node), (yyvsp[-3].Node), (yyvsp[-1].Node),  0,   0 ); TEST((yyval.Node)); }
 #line 3234 "eval_y.c"
     break;
 
-  case 124: /* bexpr: bexpr '[' expr ',' expr ',' expr ',' expr ',' expr ']'  */
-#line 1236 "eval.y"
-                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-11].Node), 5, (yyvsp[-9].Node), (yyvsp[-7].Node), (yyvsp[-5].Node), (yyvsp[-3].Node), (yyvsp[-1].Node) ); TEST((yyval.Node)); }
+  case 123: /* bexpr: bexpr '[' expr ',' expr ',' expr ',' expr ']'  */
+#line 1240 "eval.y"
+                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-9].Node), 4, (yyvsp[-7].Node), (yyvsp[-5].Node), (yyvsp[-3].Node), (yyvsp[-1].Node),   0 ); TEST((yyval.Node)); }
 #line 3240 "eval_y.c"
     break;
 
-  case 125: /* bexpr: NOT bexpr  */
-#line 1238 "eval.y"
-                { (yyval.Node) = New_Unary(lParse,  BOOLEAN, NOT, (yyvsp[0].Node) ); TEST((yyval.Node)); }
+  case 124: /* bexpr: bexpr '[' expr ',' expr ',' expr ',' expr ',' expr ']'  */
+#line 1242 "eval.y"
+                { (yyval.Node) = New_Deref(lParse,  (yyvsp[-11].Node), 5, (yyvsp[-9].Node), (yyvsp[-7].Node), (yyvsp[-5].Node), (yyvsp[-3].Node), (yyvsp[-1].Node) ); TEST((yyval.Node)); }
 #line 3246 "eval_y.c"
     break;
 
-  case 126: /* bexpr: '(' bexpr ')'  */
-#line 1240 "eval.y"
-                { (yyval.Node) = (yyvsp[-1].Node); }
+  case 125: /* bexpr: NOT bexpr  */
+#line 1244 "eval.y"
+                { (yyval.Node) = New_Unary(lParse,  BOOLEAN, NOT, (yyvsp[0].Node) ); TEST((yyval.Node)); }
 #line 3252 "eval_y.c"
     break;
 
-  case 127: /* sexpr: STRING  */
-#line 1244 "eval.y"
-                { (yyval.Node) = New_Const(lParse,  STRING, (yyvsp[0].str), strlen((yyvsp[0].str))+1 ); TEST((yyval.Node));
-                  SIZE((yyval.Node)) = strlen((yyvsp[0].str)); }
-#line 3259 "eval_y.c"
+  case 126: /* bexpr: '(' bexpr ')'  */
+#line 1246 "eval.y"
+                { (yyval.Node) = (yyvsp[-1].Node); }
+#line 3258 "eval_y.c"
     break;
 
-  case 128: /* sexpr: SCOLUMN  */
-#line 1247 "eval.y"
-                { (yyval.Node) = New_Column(lParse,  (yyvsp[0].lng) ); TEST((yyval.Node)); }
+  case 127: /* sexpr: STRING  */
+#line 1250 "eval.y"
+                { (yyval.Node) = New_Const(lParse,  STRING, (yyvsp[0].str), strlen((yyvsp[0].str))+1 ); TEST((yyval.Node));
+                  SIZE((yyval.Node)) = strlen((yyvsp[0].str)); }
 #line 3265 "eval_y.c"
     break;
 
+  case 128: /* sexpr: SCOLUMN  */
+#line 1253 "eval.y"
+                { (yyval.Node) = New_Column(lParse,  (yyvsp[0].lng) ); TEST((yyval.Node)); }
+#line 3271 "eval_y.c"
+    break;
+
   case 129: /* sexpr: SCOLUMN '{' expr '}'  */
-#line 1249 "eval.y"
+#line 1255 "eval.y"
                 {
                   if( TYPE((yyvsp[-1].Node)) != LONG
 		      || OPER((yyvsp[-1].Node)) != CONST_OP ) {
@@ -3274,23 +3280,23 @@ yyreduce:
 		  }
                   (yyval.Node) = New_Offset(lParse,  (yyvsp[-3].lng), (yyvsp[-1].Node) ); TEST((yyval.Node));
                 }
-#line 3278 "eval_y.c"
-    break;
-
-  case 130: /* sexpr: SNULLREF  */
-#line 1258 "eval.y"
-                { (yyval.Node) = New_Func(lParse,  STRING, null_fct, 0, 0, 0, 0, 0, 0, 0, 0 ); }
 #line 3284 "eval_y.c"
     break;
 
-  case 131: /* sexpr: '(' sexpr ')'  */
-#line 1260 "eval.y"
-                { (yyval.Node) = (yyvsp[-1].Node); }
+  case 130: /* sexpr: SNULLREF  */
+#line 1264 "eval.y"
+                { (yyval.Node) = New_Func(lParse,  STRING, null_fct, 0, 0, 0, 0, 0, 0, 0, 0 ); }
 #line 3290 "eval_y.c"
     break;
 
+  case 131: /* sexpr: '(' sexpr ')'  */
+#line 1266 "eval.y"
+                { (yyval.Node) = (yyvsp[-1].Node); }
+#line 3296 "eval_y.c"
+    break;
+
   case 132: /* sexpr: sexpr '+' sexpr  */
-#line 1262 "eval.y"
+#line 1268 "eval.y"
                 { 
 		  if (SIZE((yyvsp[-2].Node))+SIZE((yyvsp[0].Node)) >= MAX_STRLEN) {
 		    yyerror(scanner, lParse, "Combined string size exceeds " MAX_STRLEN_S " characters");
@@ -3299,11 +3305,11 @@ yyreduce:
 		  (yyval.Node) = New_BinOp(lParse,  STRING, (yyvsp[-2].Node), '+', (yyvsp[0].Node) );  TEST((yyval.Node));
 		  SIZE((yyval.Node)) = SIZE((yyvsp[-2].Node)) + SIZE((yyvsp[0].Node));
 		}
-#line 3303 "eval_y.c"
+#line 3309 "eval_y.c"
     break;
 
   case 133: /* sexpr: bexpr '?' sexpr ':' sexpr  */
-#line 1271 "eval.y"
+#line 1277 "eval.y"
                 {
 		  int outSize;
                   if( SIZE((yyvsp[-4].Node))!=1 ) {
@@ -3321,11 +3327,11 @@ yyreduce:
                   TEST((yyval.Node));
                   if( SIZE((yyvsp[-2].Node))<SIZE((yyvsp[0].Node)) )  Copy_Dims( lParse,(yyval.Node), (yyvsp[0].Node));
                 }
-#line 3325 "eval_y.c"
+#line 3331 "eval_y.c"
     break;
 
   case 134: /* sexpr: FUNCTION sexpr ',' sexpr ')'  */
-#line 1290 "eval.y"
+#line 1296 "eval.y"
                 { 
 		  if (FSTRCMP((yyvsp[-4].str),"DEFNULL(") == 0) {
 		     int outSize;
@@ -3344,11 +3350,11 @@ yyreduce:
 		     YYERROR;
 		  }
 		}
-#line 3348 "eval_y.c"
+#line 3354 "eval_y.c"
     break;
 
   case 135: /* sexpr: FUNCTION sexpr ',' expr ',' expr ')'  */
-#line 1309 "eval.y"
+#line 1315 "eval.y"
                 { 
 		  if (FSTRCMP((yyvsp[-6].str),"STRMID(") == 0) {
 		    int len;
@@ -3375,11 +3381,11 @@ yyreduce:
 		     YYERROR;
 		  }
 		}
-#line 3379 "eval_y.c"
+#line 3385 "eval_y.c"
     break;
 
 
-#line 3383 "eval_y.c"
+#line 3389 "eval_y.c"
 
       default: break;
     }
@@ -3572,7 +3578,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 1338 "eval.y"
+#line 1344 "eval.y"
 
 
 /*************************************************************************/
@@ -4317,9 +4323,14 @@ static int Close_Vec( ParseData *lParse, int vecNode )
 
    this = lParse->Nodes + vecNode;
    for( n=0; n < this->nSubNodes; n++ ) {
-      if( TYPE( this->SubNodes[n] ) != this->type ) {
-	 this->SubNodes[n] = New_Unary( lParse, this->type, 0, this->SubNodes[n] );
-	 if( this->SubNodes[n]<0 ) return(-1);
+      int subnode = this->SubNodes[n];
+      if( TYPE( subnode ) != this->type ) {
+         /* New_Unary may change the lParse->Nodes pointer if 
+            it performs a realloc. Therefore reset 'this' just in case. */
+	 subnode = New_Unary( lParse, this->type, 0, this->SubNodes[n] );
+	 if( subnode<0 ) return(-1);
+         this = lParse->Nodes + vecNode;
+         this->SubNodes[n] = subnode;
       }
       nelem += SIZE(this->SubNodes[n]);
    }
@@ -4634,6 +4645,27 @@ static void Allocate_Ptrs( ParseData *lParse, Node *this )
    }
 }
 
+static void free_node_buffer(Node *node)
+{
+   if( node->type==BITSTR || node->type==STRING )
+   {
+      if( node->value.data.strptr )
+      {
+         if( node->value.data.strptr[0] )
+            free( node->value.data.strptr[0] );
+         free( node->value.data.strptr );
+         node->value.data.strptr = NULL;
+      }
+   }
+   else if( node->value.data.ptr )
+   {
+      free( node->value.data.ptr );
+      node->value.data.ptr = NULL;
+   }
+
+   node->value.undef = NULL;
+}
+
 static void Do_Unary( ParseData *lParse, Node *this )
 {
    Node *that;
@@ -4784,6 +4816,16 @@ static void Do_Offset( ParseData *lParse, Node *this )
 
    nelem = nRealElem;
 
+   if ((fRow >=0 && (LONG_MAX - lParse->nRows < fRow)) ||
+       (fRow < 0 && (LONG_MIN + lParse->firstDataRow+1 > fRow)))       
+   {
+      yyerror(0, lParse, "numerical underflow or overflow for row offset value");
+      if (!lParse->status)
+         lParse->status = PARSE_SYNTAX_ERR;
+      free_node_buffer(this);
+      return;
+   }
+
    if( fRow < lParse->firstDataRow ) {
 
       /* Must fill in data at start of array */
@@ -4814,7 +4856,7 @@ static void Do_Offset( ParseData *lParse, Node *this )
    } else if( fRow + lParse->nRows > lParse->firstDataRow + lParse->nDataRows ) {
 
       /* Must fill in data at end of array */
-
+      
       nRowReload = (fRow+lParse->nRows) - (lParse->firstDataRow+lParse->nDataRows);
       if( nRowReload>lParse->nRows ) {
 	 nRowReload = lParse->nRows;
@@ -4885,6 +4927,29 @@ static void Do_Offset( ParseData *lParse, Node *this )
    else
       elem = lParse->nRows * nelem;
 
+   if (rowOffset > 0)
+   {
+      if (rowOffset > LONG_MAX/nelem)
+      {
+         yyerror(0, lParse, "numerical overflow for row offset * nelem value");
+         if (!lParse->status)
+            lParse->status = PARSE_SYNTAX_ERR;
+         free_node_buffer(this);
+         return;
+      }
+   }
+   else if (rowOffset < 0)
+   {
+      if (rowOffset < LONG_MIN/nelem)
+      {
+         yyerror(0, lParse, "numerical underflow for row offset * nelem value");
+         if (!lParse->status)
+            lParse->status = PARSE_SYNTAX_ERR;
+         free_node_buffer(this);
+         return;
+      }
+   }
+   
    offset = nelem * rowOffset;
    while( nRowOverlap-- && !lParse->status ) {
       while( nelem-- && !lParse->status ) {
@@ -5522,15 +5587,23 @@ static void Do_BinOp_lng( ParseData *lParse, Node *this )
 	    case '^':  this->value.data.lngptr[elem] = (val1  ^ val2);   break;
 
 	    case '%':   
-	       if( val2 ) this->value.data.lngptr[elem] = (val1 % val2);
-	       else {
+               if( val2 ) {
+                 if (val1 == LONG_MIN && val2 == -1)
+                    this->value.data.lngptr[elem] = 0;
+                 else
+                    this->value.data.lngptr[elem] = (val1 % val2);
+	       } else {
 		 this->value.data.lngptr[elem] = 0;
 		 this->value.undef[elem] = 1;
 	       }
 	       break;
 	    case '/': 
-	       if( val2 ) this->value.data.lngptr[elem] = (val1 / val2); 
-	       else {
+               if( val2 ) {
+                 if (val1 == LONG_MIN && val2 == -1)
+                    this->value.data.lngptr[elem] = LONG_MAX;
+                 else
+                    this->value.data.lngptr[elem] = (val1 / val2);
+	       } else {
 		 this->value.data.lngptr[elem] = 0;
 		 this->value.undef[elem] = 1;
 	       }
@@ -5550,6 +5623,23 @@ static void Do_BinOp_lng( ParseData *lParse, Node *this )
    if( that2->operation>0 ) {
       free( that2->value.data.ptr );
    }
+}
+
+static int validate_double_vector(ParseData *lParse, Node *node)
+{
+   uintptr_t data = (uintptr_t)node->value.data.dblptr;
+   uintptr_t undef = (uintptr_t)node->value.undef;
+
+   if( data == 0 || data < PARSER_VECTOR_MIN_ADDR ||
+       undef == 0 || undef < PARSER_VECTOR_MIN_ADDR )
+   {
+      yyerror(0, lParse, "parser column data unavailable");
+      if( !lParse->status )
+         lParse->status = PARSE_SYNTAX_ERR;
+      return 0;
+   }
+
+   return 1;
 }
 
 static void Do_BinOp_dbl( ParseData *lParse, Node *this )
@@ -5576,6 +5666,12 @@ static void Do_BinOp_dbl( ParseData *lParse, Node *this )
    else {
       val2  = that2->value.data.dbl;
    } 
+
+   if( vector1 && !validate_double_vector(lParse, that1) )
+      return;
+
+   if( vector2 && !validate_double_vector(lParse, that2) )
+      return;
 
    if( !vector1 && !vector2 ) {  /*  Result is a constant  */
 
@@ -7652,6 +7748,7 @@ static void Do_Deref( ParseData *lParse, Node *this )
 	 } else {
 	    yyerror(0, lParse, "Index out of range");
 	    free( this->value.data.ptr );
+            this->value.data.ptr = 0;
 	 }
 	 
       } else if( allConst && nDims==1 ) {
@@ -7662,6 +7759,7 @@ static void Do_Deref( ParseData *lParse, Node *this )
 	     dimVals[0] > theVar->value.naxes[ theVar->value.naxis-1 ] ) {
 	    yyerror(0, lParse, "Index out of range");
 	    free( this->value.data.ptr );
+            this->value.data.ptr = 0;
 	 } else if ( this->type == BITSTR || this->type == STRING ) {
 	    elem = this->value.nelem * (dimVals[0]-1);
 	    for( row=0; row<lParse->nRows; row++ ) {
@@ -7700,6 +7798,7 @@ static void Do_Deref( ParseData *lParse, Node *this )
 		  if( theDims[i]->value.undef[row] ) {
 		     yyerror(0, lParse, "Null encountered as vector index");
 		     free( this->value.data.ptr );
+                     this->value.data.ptr = 0;
 		     break;
 		  } else
 		     dimVals[i] = theDims[i]->value.data.lngptr[row];
@@ -7744,6 +7843,7 @@ static void Do_Deref( ParseData *lParse, Node *this )
 	    } else {
 	       yyerror(0, lParse, "Index out of range");
 	       free( this->value.data.ptr );
+               this->value.data.ptr = 0;
 	    }
 	 }
 
@@ -7758,6 +7858,7 @@ static void Do_Deref( ParseData *lParse, Node *this )
 	    if( theDims[0]->value.undef[row] ) {
 	       yyerror(0, lParse, "Null encountered as vector index");
 	       free( this->value.data.ptr );
+               this->value.data.ptr = 0;
 	       break;
 	    } else
 	       dimVals[0] = theDims[0]->value.data.lngptr[row];
@@ -7766,6 +7867,7 @@ static void Do_Deref( ParseData *lParse, Node *this )
 		dimVals[0] > theVar->value.naxes[ theVar->value.naxis-1 ] ) {
 	       yyerror(0, lParse, "Index out of range");
 	       free( this->value.data.ptr );
+               this->value.data.ptr = 0;
 	    } else if ( this->type == BITSTR || this->type == STRING ) {
 	      elem = this->value.nelem * (dimVals[0]-1);
 	      elem += row*(theVar->value.nelem+1);

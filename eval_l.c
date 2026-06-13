@@ -1,6 +1,6 @@
-#line 1 "eval_l.c"
+#line 2 "eval_l.c"
 
-#line 3 "eval_l.c"
+#line 4 "eval_l.c"
 
 #define  YY_INT_ALIGNED short int
 
@@ -922,8 +922,8 @@ static int expr_read( ParseData *lParse, char *buf, int nbytes );
         if ( (result = expr_read( yylParse, (char *) buf, max_size )) < 0 ) \
             YY_FATAL_ERROR( "read() in flex scanner failed" );
 
-#line 925 "eval_l.c"
 #line 926 "eval_l.c"
+#line 927 "eval_l.c"
 
 #define INITIAL 0
 
@@ -1200,7 +1200,7 @@ YY_DECL
 #line 158 "eval.l"
 
 
-#line 1203 "eval_l.c"
+#line 1204 "eval_l.c"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -1300,49 +1300,79 @@ YY_RULE_SETUP
 		  }
                   tmpstring[len] = '\0';
                   bitstring[0] = '\0';
-		  len = 0;
-                  while ( tmpstring[len] != '\0')
+		  size_t bitlen = 0;
+		  size_t bitcap = sizeof(bitstring) - 1;
+		  int overflow = 0;
+		  for (len = 0; tmpstring[len] != '\0'; len++)
                        {
+			const char *chunk = NULL;
+			size_t chunk_len = 0;
 			switch ( tmpstring[len] )
 			      {
 			       case '0':
-					strcat(bitstring,OCT_0);
+					chunk = OCT_0;
+					chunk_len = sizeof(OCT_0) - 1;
 					break;
 			       case '1':
-					strcat(bitstring,OCT_1);
+					chunk = OCT_1;
+					chunk_len = sizeof(OCT_1) - 1;
 					break;
 			       case '2':
-					strcat(bitstring,OCT_2);
+					chunk = OCT_2;
+					chunk_len = sizeof(OCT_2) - 1;
 					break;
 			       case '3':
-					strcat(bitstring,OCT_3);
+					chunk = OCT_3;
+					chunk_len = sizeof(OCT_3) - 1;
 					break;
 			       case '4':
-					strcat(bitstring,OCT_4);
+					chunk = OCT_4;
+					chunk_len = sizeof(OCT_4) - 1;
 					break;
 			       case '5':
-					strcat(bitstring,OCT_5);
+					chunk = OCT_5;
+					chunk_len = sizeof(OCT_5) - 1;
 					break;
 			       case '6':
-					strcat(bitstring,OCT_6);
+					chunk = OCT_6;
+					chunk_len = sizeof(OCT_6) - 1;
 					break;
 			       case '7':
-					strcat(bitstring,OCT_7);
+					chunk = OCT_7;
+					chunk_len = sizeof(OCT_7) - 1;
 					break;
 			       case 'x':
 			       case 'X':
-					strcat(bitstring,OCT_X);
+					chunk = OCT_X;
+					chunk_len = sizeof(OCT_X) - 1;
 					break;
 			      }
-			len++;
+			if (chunk) {
+			   if (bitlen + chunk_len > bitcap) {
+			     char errMsg[100];
+			     yylParse->status = PARSE_SYNTAX_ERR;
+			     strcpy (errMsg,"Bit string exceeds maximum length: '");
+			     strncat(errMsg, &(yytext[0]), 20);
+			     strcat (errMsg,"...'");
+			     ffpmsg (errMsg);
+			     overflow = 1;
+			     break;
+			   }
+			   memcpy(bitstring + bitlen, chunk, chunk_len);
+			   bitlen += chunk_len;
+			   bitstring[bitlen] = '\0';
+			}
                        }
-                  strcpy( yylval->str, bitstring );
+                  if (overflow)
+		    yylval->str[0] = '\0';
+		  else
+                    strcpy( yylval->str, bitstring );
 		  return( BITSTR );
 		}
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 231 "eval.l"
+#line 261 "eval.l"
 {
                   int len;
                   char tmpstring[256];
@@ -1364,80 +1394,118 @@ YY_RULE_SETUP
 		  }
                   tmpstring[len] = '\0';
                   bitstring[0] = '\0';
-		  len = 0;
-                  while ( tmpstring[len] != '\0')
+		  size_t bitlen = 0;
+		  size_t bitcap = sizeof(bitstring) - 1;
+		  int overflow = 0;
+                  for (len = 0; tmpstring[len] != '\0'; len++)
                        {
+			const char *chunk = NULL;
+			size_t chunk_len = 0;
 			switch ( tmpstring[len] )
 			      {
 			       case '0':
-					strcat(bitstring,HEX_0);
+					chunk = HEX_0;
+					chunk_len = sizeof(HEX_0) - 1;
 					break;
 			       case '1':
-					strcat(bitstring,HEX_1);
+					chunk = HEX_1;
+					chunk_len = sizeof(HEX_1) - 1;
 					break;
 			       case '2':
-					strcat(bitstring,HEX_2);
+					chunk = HEX_2;
+					chunk_len = sizeof(HEX_2) - 1;
 					break;
 			       case '3':
-					strcat(bitstring,HEX_3);
+					chunk = HEX_3;
+					chunk_len = sizeof(HEX_3) - 1;
 					break;
 			       case '4':
-					strcat(bitstring,HEX_4);
+					chunk = HEX_4;
+					chunk_len = sizeof(HEX_4) - 1;
 					break;
 			       case '5':
-					strcat(bitstring,HEX_5);
+					chunk = HEX_5;
+					chunk_len = sizeof(HEX_5) - 1;
 					break;
 			       case '6':
-					strcat(bitstring,HEX_6);
+					chunk = HEX_6;
+					chunk_len = sizeof(HEX_6) - 1;
 					break;
 			       case '7':
-					strcat(bitstring,HEX_7);
+					chunk = HEX_7;
+					chunk_len = sizeof(HEX_7) - 1;
 					break;
 			       case '8':
-					strcat(bitstring,HEX_8);
+					chunk = HEX_8;
+					chunk_len = sizeof(HEX_8) - 1;
 					break;
 			       case '9':
-					strcat(bitstring,HEX_9);
+					chunk = HEX_9;
+					chunk_len = sizeof(HEX_9) - 1;
 					break;
 			       case 'a':
 			       case 'A':
-					strcat(bitstring,HEX_A);
+					chunk = HEX_A;
+					chunk_len = sizeof(HEX_A) - 1;
 					break;
 			       case 'b':
 			       case 'B':
-					strcat(bitstring,HEX_B);
+					chunk = HEX_B;
+					chunk_len = sizeof(HEX_B) - 1;
 					break;
 			       case 'c':
 			       case 'C':
-					strcat(bitstring,HEX_C);
+					chunk = HEX_C;
+					chunk_len = sizeof(HEX_C) - 1;
 					break;
 			       case 'd':
 			       case 'D':
-					strcat(bitstring,HEX_D);
+					chunk = HEX_D;
+					chunk_len = sizeof(HEX_D) - 1;
 					break;
 			       case 'e':
 			       case 'E':
-					strcat(bitstring,HEX_E);
+					chunk = HEX_E;
+					chunk_len = sizeof(HEX_E) - 1;
 					break;
 			       case 'f':
 			       case 'F':
-					strcat(bitstring,HEX_F);
+					chunk = HEX_F;
+					chunk_len = sizeof(HEX_F) - 1;
 					break;
 			       case 'x':
 			       case 'X':
-					strcat(bitstring,HEX_X);
+					chunk = HEX_X;
+					chunk_len = sizeof(HEX_X) - 1;
 					break;
 			      }
-			len++;
+			if (chunk) {
+			   if (bitlen + chunk_len > bitcap) {
+			     char errMsg[100];
+			     yylParse->status = PARSE_SYNTAX_ERR;
+			     strcpy (errMsg,"Hex string exceeds maximum length: '");
+			     strncat(errMsg, &(yytext[0]), 20);
+			     strcat (errMsg,"...'");
+			     ffpmsg (errMsg);
+			     overflow = 1;
+			     break;
+			   }
+			   memcpy(bitstring + bitlen, chunk, chunk_len);
+			   bitlen += chunk_len;
+			   bitstring[bitlen] = '\0';
+			}
                        }
 
-                  strcpy( yylval->str, bitstring );
+                  if (overflow)
+		    yylval->str[0] = '\0';
+		  else
+                    strcpy( yylval->str, bitstring );
 		  return( BITSTR );
 		}
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 322 "eval.l"
+#line 390 "eval.l"
 {
 		  long int constval = 0;
 		  char *p;
@@ -1450,7 +1518,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 331 "eval.l"
+#line 399 "eval.l"
 {
 		  long int constval = 0;
 		  char *p;
@@ -1463,7 +1531,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 340 "eval.l"
+#line 408 "eval.l"
 {
 		  long int constval = 0;
 		  char *p;
@@ -1477,7 +1545,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 352 "eval.l"
+#line 420 "eval.l"
 {
                   yylval->lng = atol(yytext);
 		  return( LONG );
@@ -1485,7 +1553,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 356 "eval.l"
+#line 424 "eval.l"
 {
                   if ((yytext[0] == 't') || (yytext[0] == 'T'))
 		    yylval->log = 1;
@@ -1496,7 +1564,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 363 "eval.l"
+#line 431 "eval.l"
 {
                   yylval->dbl = atof(yytext);
 		  return( DOUBLE );
@@ -1504,7 +1572,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 367 "eval.l"
+#line 435 "eval.l"
 {
                   if(        !fits_strcasecmp(yytext,"#PI") ) {
 		     yylval->dbl = (double)(4) * atan((double)(1));
@@ -1538,7 +1606,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 397 "eval.l"
+#line 465 "eval.l"
 {
                   int len;
                   len = strlen(yytext) - 2;
@@ -1559,7 +1627,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 414 "eval.l"
+#line 482 "eval.l"
 {
 		 int    len,type;
 
@@ -1575,7 +1643,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 426 "eval.l"
+#line 494 "eval.l"
 {
                   char *fname;
 		  int len=0;
@@ -1612,86 +1680,86 @@ YY_RULE_SETUP
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 459 "eval.l"
+#line 527 "eval.l"
 { return( INTCAST ); }
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 460 "eval.l"
+#line 528 "eval.l"
 { return( FLTCAST ); }
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 461 "eval.l"
+#line 529 "eval.l"
 { return( POWER   ); }
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 462 "eval.l"
+#line 530 "eval.l"
 { return( NOT     ); }
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 463 "eval.l"
+#line 531 "eval.l"
 { return( OR      ); }
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 464 "eval.l"
+#line 532 "eval.l"
 { return( AND     ); }
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 465 "eval.l"
+#line 533 "eval.l"
 { return( EQ      ); }
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 466 "eval.l"
+#line 534 "eval.l"
 { return( NE      ); }
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 467 "eval.l"
+#line 535 "eval.l"
 { return( GT      ); }
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 468 "eval.l"
+#line 536 "eval.l"
 { return( LT      ); }
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-#line 469 "eval.l"
+#line 537 "eval.l"
 { return( GTE     ); }
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-#line 470 "eval.l"
+#line 538 "eval.l"
 { return( LTE     ); }
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-#line 471 "eval.l"
+#line 539 "eval.l"
 { return( XOR     ); }
 	YY_BREAK
 case 28:
 /* rule 28 can match eol */
 YY_RULE_SETUP
-#line 472 "eval.l"
+#line 540 "eval.l"
 { return( '\n'    ); }
 	YY_BREAK
 case 29:
 YY_RULE_SETUP
-#line 473 "eval.l"
+#line 541 "eval.l"
 { return( yytext[0] ); }
 	YY_BREAK
 case 30:
 YY_RULE_SETUP
-#line 474 "eval.l"
+#line 542 "eval.l"
 ECHO;
 	YY_BREAK
-#line 1694 "eval_l.c"
+#line 1763 "eval_l.c"
 case YY_STATE_EOF(INITIAL):
 	yyterminate();
 
@@ -2872,7 +2940,7 @@ void yyfree (void * ptr , yyscan_t yyscanner)
 
 #define YYTABLES_NAME "yytables"
 
-#line 474 "eval.l"
+#line 542 "eval.l"
 
 
 int yywrap(yyscan_t scanner)

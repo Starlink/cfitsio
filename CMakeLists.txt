@@ -26,7 +26,7 @@ set(CMAKE_INCLUDE_CURRENT_DIR_IN_INTERFACE ON)
 SET(${PROJECT_NAME}_SONAME 10)
 SET(${PROJECT_NAME}_MAJOR 4)
 SET(${PROJECT_NAME}_MINOR 6)
-SET(${PROJECT_NAME}_MICRO 3)
+SET(${PROJECT_NAME}_MICRO 4)
 SET(${PROJECT_NAME}_VERSION ${${PROJECT_NAME}_MAJOR}.${${PROJECT_NAME}_MINOR}.${${PROJECT_NAME}_MICRO})
 SET(LIB_NAME cfitsio)
 
@@ -55,6 +55,8 @@ OPTION(USE_CURL "USE_CURL" ON)
 OPTION(USE_PTHREADS "Thread-safe build (using pthreads)" OFF)
 
 OPTION(TESTS "Build test programs Testprog and cookbook" ON)
+
+OPTION(ITERPROGS "Build programs that test the CFITSIO iterator function" OFF)
 
 OPTION(UTILS "Build helper programs [fpack, funpack, fitscopy, fitsverify, imcopy, smem, speed]" ON)
 
@@ -352,7 +354,7 @@ IF (TESTS)
     ADD_TEST(TestProg TestProg)
     # Copy testprog.tpt to build directory to allow quick test
     # of ./TestProg (or .\Release\TestProg.exe in MSVC):
-    FILE(COPY ${CMAKE_SOURCE_DIR}/testprog.tpt DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+    FILE(COPY ${CMAKE_CURRENT_SOURCE_DIR}/testprog.tpt DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
     ADD_EXECUTABLE(cookbook utilities/cookbook.c)
     TARGET_LINK_LIBRARIES(cookbook ${LIB_NAME})
@@ -361,6 +363,22 @@ IF (TESTS)
     install(TARGETS cookbook RUNTIME DESTINATION bin)
 
 ENDIF(TESTS)
+
+IF (ITERPROGS)
+
+    ADD_EXECUTABLE(Iter_Image utilities/iter_image.c)
+    TARGET_LINK_LIBRARIES(Iter_Image ${LIB_NAME})
+    #ADD_TEST(Iter_Image Iter_Image)
+    #install(TARGETS Iter_Image RUNTIME DESTINATION bin)
+    FILE(COPY ${CMAKE_SOURCE_DIR}/iter_image.fit DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
+    ADD_EXECUTABLE(Iter_Var utilities/iter_var.c)
+    TARGET_LINK_LIBRARIES(Iter_Var ${LIB_NAME})
+    #ADD_TEST(Iter_Var Iter_Var)
+    #install(TARGETS Iter_Var RUNTIME DESTINATION bin)
+    FILE(COPY ${CMAKE_SOURCE_DIR}/vari.fits DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
+ENDIF(ITERPROGS)
 
 #==============================================================================
 # Utilities:

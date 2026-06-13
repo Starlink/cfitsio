@@ -10,6 +10,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <stddef.h>  /* apparently needed to define size_t */
+#include <limits.h>
 #ifdef CFITSIO_HAVE_CURL
   #include <curl/curl.h>
 #endif
@@ -3347,11 +3348,15 @@ int fits_copy_image_section(
        lpixels[ii] = smax;
        incs[ii] = sinc;
 
-       if (smin <= smax)
-           outnaxes[ii] = (smax - smin + sinc) / sinc;
-       else
-           outnaxes[ii] = (smin - smax + sinc) / sinc;
-
+       LONGLONG lllength = labs(smax - smin)/sinc + 1;
+       if (lllength > LONG_MAX)
+       {
+          ffpmsg("image range exceeds LONG_MAX limit");
+          ffpmsg(expr);
+          return(*status = NUM_OVERFLOW);          
+       }
+       outnaxes[ii] = (long)lllength;
+       
        /* modify the NAXISn keyword */
        fits_make_keyn("NAXIS", ii + 1, keyname, status);
        fits_modify_key_lng(newptr, keyname, outnaxes[ii], NULL, status);
@@ -3472,27 +3477,15 @@ int fits_copy_image_section(
 
     minrow = fpixels[1];
     maxrow = lpixels[1];
-    if (minrow > maxrow) {
-        nrowiter = (minrow - maxrow + incs[1]) / incs[1];
-    } else {
-        nrowiter = (maxrow - minrow + incs[1]) / incs[1];
-    }
+    nrowiter = labs(maxrow - minrow)/incs[1] + 1;
 
     minslice = fpixels[2];
     maxslice = lpixels[2];
-    if (minslice > maxslice) {
-        nsliceiter = (minslice - maxslice + incs[2]) / incs[2];
-    } else {
-        nsliceiter = (maxslice - minslice + incs[2]) / incs[2];
-    }
+    nsliceiter = labs(maxslice - minslice)/incs[2] + 1;
 
     mincube = fpixels[3];
     maxcube = lpixels[3];
-    if (mincube > maxcube) {
-        ncubeiter = (mincube - maxcube + incs[3]) / incs[3];
-    } else {
-        ncubeiter = (maxcube - mincube + incs[3]) / incs[3];
-    }
+    ncubeiter = labs(maxcube - mincube)/incs[3] + 1;
 
     firstpix = 1;
     for (kiter = 0; kiter < ncubeiter; kiter++)
@@ -4039,7 +4032,7 @@ int ffinit(fitsfile **fptr,      /* O - FITS file pointer                   */
     int ii, driver, slen, clobber = 0;
     char *url;
     char urltype[MAX_PREFIX_LEN], outfile[FLEN_FILENAME];
-    char tmplfile[FLEN_FILENAME], compspec[80];
+    char tmplfile[FLEN_FILENAME], compspec[FLEN_FILENAME];
     int handle, create_disk_file = 0;
 
     *fptr = 0;              /* initialize null file pointer, */
@@ -6507,7 +6500,7 @@ int ffifile2(char *url,       /* input filename */
 	  if (*ptr3 == '@') hasAt = 1;
 
 	  /* Check for overflow; add extra 4 characters if we have pre-existing expression */
-  	  if (strlen(rowfilterx) + (ptr2-ptr1 + (*rowfilterx)?4:0) > FLEN_FILENAME - 1) {
+  	  if (strlen(rowfilterx) + (ptr2-ptr1-1) + ((*rowfilterx)?4:0) > FLEN_FILENAME - 1) {
 	      free(infile);
 	      return(*status = URL_PARSE_ERROR);
 	  }
@@ -7136,7 +7129,7 @@ int ffexts(char *extspec,
             return(*status = URL_PARSE_ERROR);
         }
 
-	if (ptr2 - ptr1 > FLEN_FILENAME - 1)
+	if (ptr2 - ptr1 > FLEN_VALUE - 1)
 	{
             return(*status = URL_PARSE_ERROR); 
         }

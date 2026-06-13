@@ -86,6 +86,7 @@
 #include <time.h>
 
 #include <stdlib.h>
+#include <limits.h>
 
 #ifndef alloca
 #define alloca malloc
@@ -93,6 +94,9 @@
 
 /* Random number generators for various distributions */
 #include "simplerng.h"
+#include <stdint.h>
+
+#define PARSER_VECTOR_MIN_ADDR ((uintptr_t)0x1000)
 
    /*  Shrink the initial stack depth to keep local data <32K (mac limit)  */
    /*  yacc will allocate more space if needed, though.                    */
@@ -164,6 +168,7 @@ static int  Test_Dims ( ParseData *, int Node1, int Node2 );
 static void Copy_Dims ( ParseData *, int Node1, int Node2 );
 
 static void Allocate_Ptrs( ParseData *, Node *this );
+static void free_node_buffer(Node *node);
 static void Do_Unary     ( ParseData *, Node *this );
 static void Do_Offset    ( ParseData *, Node *this );
 static void Do_BinOp_bit ( ParseData *, Node *this );
@@ -200,6 +205,7 @@ static void  bitor (char *result, char *bitstrm1, char *bitstrm2);
 static void  bitnot(char *result, char *bits);
 static int cstrmid(ParseData *lParse, char *dest_str, int dest_len,
 		   char *src_str,  int src_len, int pos);
+static int validate_double_vector(ParseData *lParse, Node *node);
 
 static void yyerror(yyscan_t scanner, ParseData *lParse, char *s);
 
@@ -2079,9 +2085,14 @@ static int Close_Vec( ParseData *lParse, int vecNode )
 
    this = lParse->Nodes + vecNode;
    for( n=0; n < this->nSubNodes; n++ ) {
-      if( TYPE( this->SubNodes[n] ) != this->type ) {
-	 this->SubNodes[n] = New_Unary( lParse, this->type, 0, this->SubNodes[n] );
-	 if( this->SubNodes[n]<0 ) return(-1);
+      int subnode = this->SubNodes[n];
+      if( TYPE( subnode ) != this->type ) {
+         /* New_Unary may change the lParse->Nodes pointer if 
+            it performs a realloc. Therefore reset 'this' just in case. */
+	 subnode = New_Unary( lParse, this->type, 0, this->SubNodes[n] );
+	 if( subnode<0 ) return(-1);
+         this = lParse->Nodes + vecNode;
+         this->SubNodes[n] = subnode;
       }
       nelem += SIZE(this->SubNodes[n]);
    }
@@ -2396,6 +2407,27 @@ static void Allocate_Ptrs( ParseData *lParse, Node *this )
    }
 }
 
+static void free_node_buffer(Node *node)
+{
+   if( node->type==BITSTR || node->type==STRING )
+   {
+      if( node->value.data.strptr )
+      {
+         if( node->value.data.strptr[0] )
+            free( node->value.data.strptr[0] );
+         free( node->value.data.strptr );
+         node->value.data.strptr = NULL;
+      }
+   }
+   else if( node->value.data.ptr )
+   {
+      free( node->value.data.ptr );
+      node->value.data.ptr = NULL;
+   }
+
+   node->value.undef = NULL;
+}
+
 static void Do_Unary( ParseData *lParse, Node *this )
 {
    Node *that;
@@ -2546,6 +2578,16 @@ static void Do_Offset( ParseData *lParse, Node *this )
 
    nelem = nRealElem;
 
+   if ((fRow >=0 && (LONG_MAX - lParse->nRows < fRow)) ||
+       (fRow < 0 && (LONG_MIN + lParse->firstDataRow+1 > fRow)))       
+   {
+      yyerror(0, lParse, "numerical underflow or overflow for row offset value");
+      if (!lParse->status)
+         lParse->status = PARSE_SYNTAX_ERR;
+      free_node_buffer(this);
+      return;
+   }
+
    if( fRow < lParse->firstDataRow ) {
 
       /* Must fill in data at start of array */
@@ -2576,7 +2618,7 @@ static void Do_Offset( ParseData *lParse, Node *this )
    } else if( fRow + lParse->nRows > lParse->firstDataRow + lParse->nDataRows ) {
 
       /* Must fill in data at end of array */
-
+      
       nRowReload = (fRow+lParse->nRows) - (lParse->firstDataRow+lParse->nDataRows);
       if( nRowReload>lParse->nRows ) {
 	 nRowReload = lParse->nRows;
@@ -2647,6 +2689,29 @@ static void Do_Offset( ParseData *lParse, Node *this )
    else
       elem = lParse->nRows * nelem;
 
+   if (rowOffset > 0)
+   {
+      if (rowOffset > LONG_MAX/nelem)
+      {
+         yyerror(0, lParse, "numerical overflow for row offset * nelem value");
+         if (!lParse->status)
+            lParse->status = PARSE_SYNTAX_ERR;
+         free_node_buffer(this);
+         return;
+      }
+   }
+   else if (rowOffset < 0)
+   {
+      if (rowOffset < LONG_MIN/nelem)
+      {
+         yyerror(0, lParse, "numerical underflow for row offset * nelem value");
+         if (!lParse->status)
+            lParse->status = PARSE_SYNTAX_ERR;
+         free_node_buffer(this);
+         return;
+      }
+   }
+   
    offset = nelem * rowOffset;
    while( nRowOverlap-- && !lParse->status ) {
       while( nelem-- && !lParse->status ) {
@@ -3284,15 +3349,23 @@ static void Do_BinOp_lng( ParseData *lParse, Node *this )
 	    case '^':  this->value.data.lngptr[elem] = (val1  ^ val2);   break;
 
 	    case '%':   
-	       if( val2 ) this->value.data.lngptr[elem] = (val1 % val2);
-	       else {
+               if( val2 ) {
+                 if (val1 == LONG_MIN && val2 == -1)
+                    this->value.data.lngptr[elem] = 0;
+                 else
+                    this->value.data.lngptr[elem] = (val1 % val2);
+	       } else {
 		 this->value.data.lngptr[elem] = 0;
 		 this->value.undef[elem] = 1;
 	       }
 	       break;
 	    case '/': 
-	       if( val2 ) this->value.data.lngptr[elem] = (val1 / val2); 
-	       else {
+               if( val2 ) {
+                 if (val1 == LONG_MIN && val2 == -1)
+                    this->value.data.lngptr[elem] = LONG_MAX;
+                 else
+                    this->value.data.lngptr[elem] = (val1 / val2);
+	       } else {
 		 this->value.data.lngptr[elem] = 0;
 		 this->value.undef[elem] = 1;
 	       }
@@ -3312,6 +3385,23 @@ static void Do_BinOp_lng( ParseData *lParse, Node *this )
    if( that2->operation>0 ) {
       free( that2->value.data.ptr );
    }
+}
+
+static int validate_double_vector(ParseData *lParse, Node *node)
+{
+   uintptr_t data = (uintptr_t)node->value.data.dblptr;
+   uintptr_t undef = (uintptr_t)node->value.undef;
+
+   if( data == 0 || data < PARSER_VECTOR_MIN_ADDR ||
+       undef == 0 || undef < PARSER_VECTOR_MIN_ADDR )
+   {
+      yyerror(0, lParse, "parser column data unavailable");
+      if( !lParse->status )
+         lParse->status = PARSE_SYNTAX_ERR;
+      return 0;
+   }
+
+   return 1;
 }
 
 static void Do_BinOp_dbl( ParseData *lParse, Node *this )
@@ -3338,6 +3428,12 @@ static void Do_BinOp_dbl( ParseData *lParse, Node *this )
    else {
       val2  = that2->value.data.dbl;
    } 
+
+   if( vector1 && !validate_double_vector(lParse, that1) )
+      return;
+
+   if( vector2 && !validate_double_vector(lParse, that2) )
+      return;
 
    if( !vector1 && !vector2 ) {  /*  Result is a constant  */
 
@@ -5414,6 +5510,7 @@ static void Do_Deref( ParseData *lParse, Node *this )
 	 } else {
 	    yyerror(0, lParse, "Index out of range");
 	    free( this->value.data.ptr );
+            this->value.data.ptr = 0;
 	 }
 	 
       } else if( allConst && nDims==1 ) {
@@ -5424,6 +5521,7 @@ static void Do_Deref( ParseData *lParse, Node *this )
 	     dimVals[0] > theVar->value.naxes[ theVar->value.naxis-1 ] ) {
 	    yyerror(0, lParse, "Index out of range");
 	    free( this->value.data.ptr );
+            this->value.data.ptr = 0;
 	 } else if ( this->type == BITSTR || this->type == STRING ) {
 	    elem = this->value.nelem * (dimVals[0]-1);
 	    for( row=0; row<lParse->nRows; row++ ) {
@@ -5462,6 +5560,7 @@ static void Do_Deref( ParseData *lParse, Node *this )
 		  if( theDims[i]->value.undef[row] ) {
 		     yyerror(0, lParse, "Null encountered as vector index");
 		     free( this->value.data.ptr );
+                     this->value.data.ptr = 0;
 		     break;
 		  } else
 		     dimVals[i] = theDims[i]->value.data.lngptr[row];
@@ -5506,6 +5605,7 @@ static void Do_Deref( ParseData *lParse, Node *this )
 	    } else {
 	       yyerror(0, lParse, "Index out of range");
 	       free( this->value.data.ptr );
+               this->value.data.ptr = 0;
 	    }
 	 }
 
@@ -5520,6 +5620,7 @@ static void Do_Deref( ParseData *lParse, Node *this )
 	    if( theDims[0]->value.undef[row] ) {
 	       yyerror(0, lParse, "Null encountered as vector index");
 	       free( this->value.data.ptr );
+               this->value.data.ptr = 0;
 	       break;
 	    } else
 	       dimVals[0] = theDims[0]->value.data.lngptr[row];
@@ -5528,6 +5629,7 @@ static void Do_Deref( ParseData *lParse, Node *this )
 		dimVals[0] > theVar->value.naxes[ theVar->value.naxis-1 ] ) {
 	       yyerror(0, lParse, "Index out of range");
 	       free( this->value.data.ptr );
+               this->value.data.ptr = 0;
 	    } else if ( this->type == BITSTR || this->type == STRING ) {
 	      elem = this->value.nelem * (dimVals[0]-1);
 	      elem += row*(theVar->value.nelem+1);

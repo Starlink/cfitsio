@@ -198,6 +198,10 @@ static void signal_handler(int sig);
 #define NET_OOB 1
 #define NET_PEEK 2
 
+/* Maximum allowed http redirection attempts (or recursive
+   calls of http_open_network). */
+#define MAX_HTTP_REDIRECT 10
+
 /* local defines and variables */
 #define MAXLEN 1200
 #define SHORTLEN 100
@@ -243,7 +247,7 @@ static int CreateSocketAddress(struct sockaddr_in *sockaddrPtr,
 static int ftp_status(FILE *ftp, char *statusstr);
 static int http_open_network(char *url, FILE **httpfile, char *contentencoding,
 			     char *contenttype, 
-			     int *contentlength);
+			     int *contentlength, int level);
 static int https_open_network(char *filename, curlmembuf* buffer);
 static int ftp_open_network(char *url, FILE **ftpfile, FILE **command, 
 			    int *sock);
@@ -256,8 +260,10 @@ static int encode64(unsigned s_len, char *src, unsigned d_len, char *dst);
 static int ssl_get_with_curl(char *url, curlmembuf* buffer, 
                 char* username, char* password);
 static size_t curlToMemCallback(void *buffer, size_t size, size_t nmemb, void *userp);
-static int curlProgressCallback(void *clientp, double dltotal, double dlnow,
-                           double ultotal, double ulnow);
+#ifdef CFITSIO_HAVE_CURL
+static int curlProgressCallback(void *clientp, curl_off_t dltotal, curl_off_t dlnow,
+                           curl_off_t ultotal, curl_off_t ulnow);
+#endif
 
 /***************************/
 /* Static variables */
@@ -320,7 +326,7 @@ int http_open(char *filename, int rwmode, int *handle)
   /* Open the network connection */
 
   if (http_open_network(filename,&httpfile, contentencoding, 
-			contenttype, &contentlength)) {
+			contenttype, &contentlength, 0)) {
       alarm(0);
       ffpmsg("Unable to open http file (http_open):");
       ffpmsg(filename);
@@ -462,7 +468,7 @@ int http_compress_open(char *url, int rwmode, int *handle)
   /* Open the http connectin */
   alarm(net_timeout);
   if ((status = http_open_network(url,&httpfile, contentencoding, 
-				  contenttype, &contentlength))) {
+				  contenttype, &contentlength, 0))) {
     alarm(0);
     ffpmsg("Unable to open http file (http_compress_open)");
     ffpmsg(url);
@@ -627,7 +633,7 @@ int http_file_open(char *url, int rwmode, int *handle)
   /* Open the network connection */
   alarm(net_timeout);
   if ((status = http_open_network(url,&httpfile, contentencoding,
-				  contenttype, &contentlength))) {
+				  contenttype, &contentlength, 0))) {
     alarm(0);
     ffpmsg("Unable to open http file (http_file_open)");
     ffpmsg(url);
@@ -762,7 +768,7 @@ int http_file_open(char *url, int rwmode, int *handle)
      it
 */
 static int http_open_network(char *url, FILE **httpfile, char *contentencoding,
-			     char *contenttype, int *contentlength)
+			     char *contenttype, int *contentlength, int level)
 {
 
   int status;
@@ -789,6 +795,11 @@ static int http_open_network(char *url, FILE **httpfile, char *contentencoding,
   char pfn[MAXLEN];
   char *proxy; /* URL of the proxy server */
 
+  if (level > MAX_HTTP_REDIRECT) {
+     ffpmsg("Exceeded maximum number of redirects (http_open_network)");
+     return (FILE_NOT_OPENED);
+  }
+  
   /* Parse the URL apart again */
   strcpy(turl,"http://");
   strncat(turl,url,MAXLEN - 8);
@@ -956,9 +967,10 @@ static int http_open_network(char *url, FILE **httpfile, char *contentencoding,
              *httpfile=0;
 
              /* note the recursive call to itself */
+             level++;
 	     return 
 	       http_open_network(turl,httpfile, contentencoding, 
-				 contenttype, contentlength);
+				 contenttype, contentlength, level);
           }
 
           /* It was not a HTTP to HTTP redirection, so see if it HTTP to FTP */
@@ -1282,8 +1294,9 @@ size_t curlToMemCallback(void *buffer, size_t size, size_t nmemb, void *userp)
 
 /*--------------------------------------------------------------------------*/
 /* Callback function for displaying status bar during download */
-int curlProgressCallback(void *clientp, double dltotal, double dlnow,
-      double ultotal, double ulnow)
+#ifdef CFITSIO_HAVE_CURL
+int curlProgressCallback(void *clientp, curl_off_t dltotal, curl_off_t dlnow,
+      curl_off_t ultotal, curl_off_t ulnow)
 {
    int i, fullBar = 50, nToDisplay = 0;
    int percent = 0;
@@ -1295,7 +1308,7 @@ int curlProgressCallback(void *clientp, double dltotal, double dlnow,
    /* isFirst is true the very first time this is entered. Afterwards it
       should get reset to true when isComplete is first detected to have 
       toggled from true to false. */
-   if (dltotal == 0.0)
+   if (dltotal == 0)
    {
       if (isComplete)
          isFirst = 1;
@@ -1303,7 +1316,7 @@ int curlProgressCallback(void *clientp, double dltotal, double dlnow,
       return 0;
    }
 
-   fracCompleted = dlnow/dltotal;
+   fracCompleted = (double)dlnow/(double)dltotal;
    percent = (int)ceil(fracCompleted*100.0 - 0.5);
    if (isComplete && percent < 100)
       isFirst = 1;
@@ -1338,6 +1351,7 @@ int curlProgressCallback(void *clientp, double dltotal, double dlnow,
    }
    return 0;
 }
+#endif
 
 /*--------------------------------------------------------------------------*/
 int https_open_network(char *filename, curlmembuf* buffer)
@@ -1945,7 +1959,7 @@ int ssl_get_with_curl(char *url, curlmembuf* buffer, char* username,
   strcpy(tmpUrl, url);
   if (show_fits_download_progress)
   {
-     curl_easy_setopt(curl, CURLOPT_PROGRESSFUNCTION, curlProgressCallback);
+     curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, curlProgressCallback);
      curl_easy_setopt(curl, CURLOPT_PROGRESSDATA, tmpUrl);
      curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
   }
@@ -3477,7 +3491,7 @@ int http_checkfile (char *urltype, char *infile, char *outfile1)
     strcat(newinfile,".gz");
 
     status = http_open_network(newinfile,&httpfile, contentencoding,
-			       contenttype, &contentlength);
+			       contenttype, &contentlength, 0);
     if (!status) {
       if (!strcmp(contentencoding, "ftp://")) {
           /* this is a signal from http_open_network that indicates that */
@@ -3551,7 +3565,7 @@ int http_checkfile (char *urltype, char *infile, char *outfile1)
     strcpy(newinfile,infile);
     strcat(newinfile,".Z");
     if (!http_open_network(newinfile,&httpfile, contentencoding,
-			   contenttype, &contentlength)) {
+			   contenttype, &contentlength, 0)) {
 
       if (!strcmp(contentencoding, "ftp://")) {
           /* this is a signal from http_open_network that indicates that */
@@ -3608,7 +3622,7 @@ int http_checkfile (char *urltype, char *infile, char *outfile1)
       
     strcpy(newinfile,infile);
     if (!http_open_network(newinfile,&httpfile, contentencoding,
-			   contenttype, &contentlength)) {
+			   contenttype, &contentlength, 0)) {
 
       if (!strcmp(contentencoding, "ftp://")) {
           /* this is a signal from http_open_network that indicates that */

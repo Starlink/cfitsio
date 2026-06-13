@@ -5,61 +5,53 @@
 
 /*
   This program illustrates how to use the CFITSIO iterator function.
-  It reads and modifies the input 'iter_image.fit' image file by setting
-  all the pixel values to zero (DESTROYING THE ORIGINAL IMAGE!!!)
+  It reads and modifies the input 'iter_image.fit' image file by dividing
+  all the pixel values by a factor of 10 (DESTROYING THE ORIGINAL IMAGE!!!)
 */
-int main()
+int main(int argc, char *argv[])
 {
-    extern int zero_image(); /* external work function is passed to the iterator */
+    /* external work function is passed to the iterator: */
+    extern int div_image(long totalrows, long offset, long firstrow,
+	   long nrows, int ncols, iteratorCol *cols, void *user_strct);
     fitsfile *fptr;
     iteratorCol cols[3];  /* structure used by the iterator function */
-    int n_cols;
-    long rows_per_loop, offset;
+    int n_cols =1;
+    long rows_per_loop =0 ,  /* use default optimum number of rows */
+         offset =0;  /* process all the rows */
 
-    int status, nkeys, keypos, hdutype, ii, jj;
-    char filename[]  = "iter_image.fit";     /* name of rate FITS file */
-
-    status = 0; 
+    int status=0, nkeys, keypos, hdutype, ii, jj;
+    char filename[]  = "iter_image.fit";     /* name of image FITS file */
 
     fits_open_file(&fptr, filename, READWRITE, &status); /* open file */
-
-
-    n_cols = 1;
 
     /* define input column structure members for the iterator function */
     fits_iter_set_file(&cols[0], fptr);
     fits_iter_set_iotype(&cols[0], InputOutputCol);
     fits_iter_set_datatype(&cols[0], 0);
 
-    rows_per_loop = 0;  /* use default optimum number of rows */
-    offset = 0;         /* process all the rows */
-
-    /* apply the rate function to each row of the table */
+    /* apply the div_image function to each row of the image */
     printf("Calling iterator function...%d\n", status);
 
     fits_iterate_data(n_cols, cols, offset, rows_per_loop,
-                      zero_image, 0L, &status);
+                      div_image, 0L, &status);
 
     fits_close_file(fptr, &status);      /* all done */
 
     if (status)
         fits_report_error(stderr, status);  /* print out error messages */
 
-    return(status);
+    return status;
 }
 /*--------------------------------------------------------------------------*/
-int zero_image(long totalrows, long offset, long firstrow, long nrows,
+int div_image(long totalrows, long offset, long firstrow, long nrows,
              int ncols, iteratorCol *cols, void *user_strct ) 
 
 /*
-   Sample iterator function that calculates the output flux 'rate' column
-   by dividing the input 'counts' by the 'time' column.
-   It also applies a constant deadtime correction factor if the 'deadtime'
-   keyword exists.  Finally, this creates or updates the 'LIVETIME'
-   keyword with the sum of all the individual integration times.
+   Sample iterator function that takes all pixel values of the image
+   and divides each individually by 100.
 */
 {
-    int ii, status = 0;
+    int status = 0;
 
     /* declare variables static to preserve their values between calls */
     static int *counts;
@@ -83,9 +75,9 @@ int zero_image(long totalrows, long offset, long firstrow, long nrows,
     /*  NOTE: 1st element of array is the null pixel value!  */
     /*  Loop from 1 to nrows, not 0 to nrows - 1.  */
 
-    for (ii = 1; ii <= nrows; ii++)
+    for (int ii = 1; ii <= nrows; ii++)
     {
-       counts[ii] = 1.;
+       counts[ii] /= 10 ;
     }
     printf("firstrows, nrows = %ld %ld\n", firstrow, nrows);
 

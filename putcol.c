@@ -1234,7 +1234,7 @@ int ffiter(int n_cols,
     if (n_cols  < 0 || n_cols > 999 )
     {
         ffpmsg("Illegal number of columms (ffiter)");
-        return(*status = BAD_COL_NUM);  /* negative number of columns */
+        return(*status = BAD_COL_NUM);  
     }
 
     /*------------------------------------------------------------*/
@@ -1242,7 +1242,21 @@ int ffiter(int n_cols,
     /* and column numbers and datatypes are legal.                */ 
     /* Also fill in other parameters in the column structure.     */
     /*------------------------------------------------------------*/
-
+    
+    /* Assumptions throughout regarding the existence of cols[jj].fptr:
+        1) cols[0].fptr must not be NULL
+        2) Only TemporaryCols can have NULL fptr.
+        3) IMAGE_HDU must not have a TemporaryCol. 
+       Check the first 2 here. */   
+    for (jj = 0; jj < n_cols; jj++)
+    {
+       if ((!jj || cols[jj].iotype != TemporaryCol) && cols[jj].fptr == NULL)
+       {
+          ffpmsg("Iterator column is missing FITS file pointer (ffiter)");
+          return (*status = NULL_INPUT_PTR);
+       }
+    }
+    
     ffghdt(cols[0].fptr, &hdutype, status);  /* type of first HDU */
 
     for (jj = 0; jj < n_cols; jj++)
@@ -1320,15 +1334,15 @@ int ffiter(int n_cols,
             cols[jj].colnum = 0;
             strcpy(cols[jj].colname, "IMAGE");  /* dummy name for images */
 
-            tstatus = 0;
-            ffgkys(cols[jj].fptr, "BUNIT", cols[jj].tunit, 0, &tstatus);
-
 	    if (cols[jj].iotype == TemporaryCol) {
                 snprintf(message,FLEN_ERRMSG,
 			 "Column type TemporaryCol not permitted for IMAGE HDUs (ffiter)");
                 return(*status = BAD_DATATYPE);
             }
 	      
+            tstatus = 0;
+            ffgkys(cols[jj].fptr, "BUNIT", cols[jj].tunit, 0, &tstatus);
+
         }
         else  /* operating on FITS tables */
         {
@@ -1659,6 +1673,12 @@ int ffiter(int n_cols,
             if (abs(typecode) == TBYTE || abs(typecode) == TSHORT || abs(typecode) == TLONG
                 || abs(typecode) == TINT || abs(typecode) == TLONGLONG)
             {
+                if (cols[jj].fptr == NULL)
+                {
+                   free(col);
+                   ffpmsg("Iterator column for table is missing FITS file pointer (ffiter)");
+                   return (*status = NULL_INPUT_PTR);
+                }
                 tstatus = 0;
                 if (hdutype == ASCII_TBL) /* TNULLn value is a string */
                 {

@@ -34,10 +34,10 @@ SERVICES PROVIDED HEREUNDER."
 #ifndef _FITSIO_H
 #define _FITSIO_H
 
-#define CFITSIO_VERSION 4.6.3
+#define CFITSIO_VERSION 4.6.4
 /* Minor and micro numbers must not exceed 99 under current method
    of version representataion in ffvers(). */
-#define CFITSIO_MICRO 3
+#define CFITSIO_MICRO 4
 #define CFITSIO_MINOR 6
 #define CFITSIO_MAJOR 4
 #define CFITSIO_SONAME 10
@@ -2058,9 +2058,9 @@ int CFITS_API fits_hcompress(int *a, int nx, int ny, int scale, char *output,
     long *nbytes, int *status);
 int CFITS_API fits_hcompress64(LONGLONG *a, int nx, int ny, int scale, char *output, 
     long *nbytes, int *status);
-int CFITS_API fits_hdecompress(unsigned char *input, int smooth, int *a, int *nx, 
+int CFITS_API fits_hdecompress(unsigned char *input, int smooth, int *a, int na, int *nx, 
        int *ny, int *scale, int *status);
-int CFITS_API fits_hdecompress64(unsigned char *input, int smooth, LONGLONG *a, int *nx, 
+int CFITS_API fits_hdecompress64(unsigned char *input, int smooth, LONGLONG *a, int na, int *nx, 
        int *ny, int *scale, int *status);
 
 int CFITS_API fits_compress_table  (fitsfile *infptr, fitsfile *outfptr, int *status);

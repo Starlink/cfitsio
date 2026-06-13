@@ -189,43 +189,73 @@ nl		\n
 		  }
                   tmpstring[len] = '\0';
                   bitstring[0] = '\0';
-		  len = 0;
-                  while ( tmpstring[len] != '\0')
+		  size_t bitlen = 0;
+		  size_t bitcap = sizeof(bitstring) - 1;
+		  int overflow = 0;
+		  for (len = 0; tmpstring[len] != '\0'; len++)
                        {
+			const char *chunk = NULL;
+			size_t chunk_len = 0;
 			switch ( tmpstring[len] )
 			      {
 			       case '0':
-					strcat(bitstring,OCT_0);
+					chunk = OCT_0;
+					chunk_len = sizeof(OCT_0) - 1;
 					break;
 			       case '1':
-					strcat(bitstring,OCT_1);
+					chunk = OCT_1;
+					chunk_len = sizeof(OCT_1) - 1;
 					break;
 			       case '2':
-					strcat(bitstring,OCT_2);
+					chunk = OCT_2;
+					chunk_len = sizeof(OCT_2) - 1;
 					break;
 			       case '3':
-					strcat(bitstring,OCT_3);
+					chunk = OCT_3;
+					chunk_len = sizeof(OCT_3) - 1;
 					break;
 			       case '4':
-					strcat(bitstring,OCT_4);
+					chunk = OCT_4;
+					chunk_len = sizeof(OCT_4) - 1;
 					break;
 			       case '5':
-					strcat(bitstring,OCT_5);
+					chunk = OCT_5;
+					chunk_len = sizeof(OCT_5) - 1;
 					break;
 			       case '6':
-					strcat(bitstring,OCT_6);
+					chunk = OCT_6;
+					chunk_len = sizeof(OCT_6) - 1;
 					break;
 			       case '7':
-					strcat(bitstring,OCT_7);
+					chunk = OCT_7;
+					chunk_len = sizeof(OCT_7) - 1;
 					break;
 			       case 'x':
 			       case 'X':
-					strcat(bitstring,OCT_X);
+					chunk = OCT_X;
+					chunk_len = sizeof(OCT_X) - 1;
 					break;
 			      }
-			len++;
+			if (chunk) {
+			   if (bitlen + chunk_len > bitcap) {
+			     char errMsg[100];
+			     yylParse->status = PARSE_SYNTAX_ERR;
+			     strcpy (errMsg,"Bit string exceeds maximum length: '");
+			     strncat(errMsg, &(yytext[0]), 20);
+			     strcat (errMsg,"...'");
+			     ffpmsg (errMsg);
+			     overflow = 1;
+			     break;
+			   }
+			   memcpy(bitstring + bitlen, chunk, chunk_len);
+			   bitlen += chunk_len;
+			   bitstring[bitlen] = '\0';
+			}
                        }
-                  strcpy( yylval->str, bitstring );
+                  if (overflow)
+		    yylval->str[0] = '\0';
+		  else
+                    strcpy( yylval->str, bitstring );
 		  return( BITSTR );
 		}
 {hex}		{
@@ -249,74 +279,112 @@ nl		\n
 		  }
                   tmpstring[len] = '\0';
                   bitstring[0] = '\0';
-		  len = 0;
-                  while ( tmpstring[len] != '\0')
+		  size_t bitlen = 0;
+		  size_t bitcap = sizeof(bitstring) - 1;
+		  int overflow = 0;
+                  for (len = 0; tmpstring[len] != '\0'; len++)
                        {
+			const char *chunk = NULL;
+			size_t chunk_len = 0;
 			switch ( tmpstring[len] )
 			      {
 			       case '0':
-					strcat(bitstring,HEX_0);
+					chunk = HEX_0;
+					chunk_len = sizeof(HEX_0) - 1;
 					break;
 			       case '1':
-					strcat(bitstring,HEX_1);
+					chunk = HEX_1;
+					chunk_len = sizeof(HEX_1) - 1;
 					break;
 			       case '2':
-					strcat(bitstring,HEX_2);
+					chunk = HEX_2;
+					chunk_len = sizeof(HEX_2) - 1;
 					break;
 			       case '3':
-					strcat(bitstring,HEX_3);
+					chunk = HEX_3;
+					chunk_len = sizeof(HEX_3) - 1;
 					break;
 			       case '4':
-					strcat(bitstring,HEX_4);
+					chunk = HEX_4;
+					chunk_len = sizeof(HEX_4) - 1;
 					break;
 			       case '5':
-					strcat(bitstring,HEX_5);
+					chunk = HEX_5;
+					chunk_len = sizeof(HEX_5) - 1;
 					break;
 			       case '6':
-					strcat(bitstring,HEX_6);
+					chunk = HEX_6;
+					chunk_len = sizeof(HEX_6) - 1;
 					break;
 			       case '7':
-					strcat(bitstring,HEX_7);
+					chunk = HEX_7;
+					chunk_len = sizeof(HEX_7) - 1;
 					break;
 			       case '8':
-					strcat(bitstring,HEX_8);
+					chunk = HEX_8;
+					chunk_len = sizeof(HEX_8) - 1;
 					break;
 			       case '9':
-					strcat(bitstring,HEX_9);
+					chunk = HEX_9;
+					chunk_len = sizeof(HEX_9) - 1;
 					break;
 			       case 'a':
 			       case 'A':
-					strcat(bitstring,HEX_A);
+					chunk = HEX_A;
+					chunk_len = sizeof(HEX_A) - 1;
 					break;
 			       case 'b':
 			       case 'B':
-					strcat(bitstring,HEX_B);
+					chunk = HEX_B;
+					chunk_len = sizeof(HEX_B) - 1;
 					break;
 			       case 'c':
 			       case 'C':
-					strcat(bitstring,HEX_C);
+					chunk = HEX_C;
+					chunk_len = sizeof(HEX_C) - 1;
 					break;
 			       case 'd':
 			       case 'D':
-					strcat(bitstring,HEX_D);
+					chunk = HEX_D;
+					chunk_len = sizeof(HEX_D) - 1;
 					break;
 			       case 'e':
 			       case 'E':
-					strcat(bitstring,HEX_E);
+					chunk = HEX_E;
+					chunk_len = sizeof(HEX_E) - 1;
 					break;
 			       case 'f':
 			       case 'F':
-					strcat(bitstring,HEX_F);
+					chunk = HEX_F;
+					chunk_len = sizeof(HEX_F) - 1;
 					break;
 			       case 'x':
 			       case 'X':
-					strcat(bitstring,HEX_X);
+					chunk = HEX_X;
+					chunk_len = sizeof(HEX_X) - 1;
 					break;
 			      }
-			len++;
+			if (chunk) {
+			   if (bitlen + chunk_len > bitcap) {
+			     char errMsg[100];
+			     yylParse->status = PARSE_SYNTAX_ERR;
+			     strcpy (errMsg,"Hex string exceeds maximum length: '");
+			     strncat(errMsg, &(yytext[0]), 20);
+			     strcat (errMsg,"...'");
+			     ffpmsg (errMsg);
+			     overflow = 1;
+			     break;
+			   }
+			   memcpy(bitstring + bitlen, chunk, chunk_len);
+			   bitlen += chunk_len;
+			   bitstring[bitlen] = '\0';
+			}
                        }
 
-                  strcpy( yylval->str, bitstring );
+                  if (overflow)
+		    yylval->str[0] = '\0';
+		  else
+                    strcpy( yylval->str, bitstring );
 		  return( BITSTR );
 		}
 {bitconst}      {

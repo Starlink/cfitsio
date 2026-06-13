@@ -86,7 +86,7 @@ int fffrow( fitsfile *fptr,         /* I - Input FITS file                   */
    int naxis, constant;
    long nelem, naxes[MAXDIMS], elem;
    char result;
-   ParseData lParse;
+   ParseData lParse = {0};
 
    if( *status ) return( *status );
    memset(&Info, 0, sizeof(Info));   
@@ -171,7 +171,7 @@ int ffsrow( fitsfile *infptr,   /* I - Input FITS file                      */
       LONGLONG rowLength, numRows, heapSize;
       LONGLONG dataStart, heapStart;
    } inExt, outExt;
-   ParseData lParse;
+   ParseData lParse = {0};
 
    if( *status ) return( *status );
 
@@ -427,7 +427,7 @@ int ffcrow( fitsfile *fptr,      /* I - Input FITS file                      */
    parseInfo Info;
    int naxis;
    long nelem1, naxes[MAXDIMS];
-   ParseData lParse;
+   ParseData lParse = {0};
 
    if( *status ) return( *status );
 
@@ -513,7 +513,7 @@ int ffcalc_rng( fitsfile *infptr,   /* I - Input FITS file                  */
    int col_cnt, colNo;
    Node *result;
    char card[81], tform[16], nullKwd[9], tdimKwd[9];
-   ParseData lParse;
+   ParseData lParse = {0};
 
    if( *status ) return( *status );
 
@@ -782,7 +782,7 @@ int fftexp( fitsfile *fptr,      /* I - Input FITS file                     */
 /* Evaluate the given expression and return information on the result.      */
 /*--------------------------------------------------------------------------*/
 {
-   ParseData lParse;
+   ParseData lParse = {0};
 
    ffiprs( fptr, 0, expr, maxdim, datatype, nelem, naxis, naxes, &lParse, status );
    ffcprs(&lParse);
@@ -870,6 +870,10 @@ int ffiprs( fitsfile *fptr,      /* I - Input FITS file                     */
    } else {
       lexpr = strlen(expr);
       lParse->expr = (char*)malloc( (2+lexpr)*sizeof(char));
+      if (!lParse->expr) {
+         ffpmsg("memory allocation failed (ffiprs)");
+         return (*status = MEMORY_ALLOCATION);
+      }
       strcpy(lParse->expr,expr);
    }
    strcat(lParse->expr + lexpr,"\n");
@@ -937,6 +941,7 @@ int ffiprs( fitsfile *fptr,      /* I - Input FITS file                     */
    }
    lParse->datatype = *datatype;
    FREE(lParse->expr);
+   lParse->expr = 0;
 
    if( result->operation==CONST_OP ) *nelem = - *nelem;
    return(*status);
@@ -949,6 +954,11 @@ void ffcprs( ParseData *lParse )
 /*--------------------------------------------------------------------------*/
 {
    int col, node, i;
+
+   if (lParse->expr) {
+      free(lParse->expr);
+      lParse->expr = 0;
+   }
 
    if( lParse->nCols > 0 ) {
       FREE( lParse->colData  );
@@ -1925,7 +1935,7 @@ int fffrwc( fitsfile *fptr,        /* I - Input FITS file                    */
    int naxis, constant, nCol=0;
    long nelem, naxes[MAXDIMS], elem;
    char result;
-   ParseData lParse;
+   ParseData lParse = {0};
 
    if( *status ) return( *status );
 
@@ -2193,7 +2203,7 @@ int ffffrw( fitsfile *fptr,         /* I - Input FITS file                   */
    int naxis, constant, dtype;
    long nelem, naxes[MAXDIMS];
    char result;
-   ParseData lParse;
+   ParseData lParse = {0};
 
    if( *status ) return( *status );
 
@@ -2370,8 +2380,9 @@ if (lParse->hdutype == IMAGE_HDU) {
 
    colnum = -1;
    for (i = 0; i < lParse->pixFilter->count; ++i) {
-      if (!fits_strcasecmp(colName, lParse->pixFilter->tag[i]))
-         colnum = i;
+      if (lParse->pixFilter->tag[i] &&
+            !fits_strcasecmp(colName, lParse->pixFilter->tag[i]))
+            colnum = i;
    }
    if (colnum < 0) {
       snprintf(temp, 80, "find_column: PixelFilter tag %s not found", colName);
@@ -2384,6 +2395,12 @@ if (lParse->hdutype == IMAGE_HDU) {
 
    varInfo = lParse->varData + col_cnt;
    colIter = lParse->colData + col_cnt;
+
+   if (lParse->pixFilter->ifptr[colnum] == NULL) {
+      ffpmsg("find_column: PixelFilter missing image pointer");
+      lParse->status = COL_NOT_FOUND;
+      return pERROR;
+   }
 
    fptr = lParse->pixFilter->ifptr[colnum];
    fits_get_img_param(fptr,
@@ -2713,7 +2730,7 @@ int fits_pixel_filter (PixelFilter * filter, int * status)
    char * DEFAULT_TAGS[] = { "X" };
    char msg[256];
    int writeBlankKwd = 0;   /* write BLANK if any output nulls? */
-   ParseData lParse;
+   ParseData lParse = {0};
 
    DEBUG_PIXFILTER = getenv("DEBUG_PIXFILTER") ? 1 : 0;
 

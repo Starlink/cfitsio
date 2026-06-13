@@ -248,7 +248,7 @@ int file_openfile(char *filename, int rwmode, FILE **diskfile)
         {
             /* copy user name */
             cptr = filename+1;
-            while (*cptr && (*cptr != '/'))
+            while (*cptr && (*cptr != '/') && ii < (int)sizeof(user) - 1)
             {
                 user[ii] = *cptr;
                 cptr++;
@@ -256,8 +256,18 @@ int file_openfile(char *filename, int rwmode, FILE **diskfile)
             }
             user[ii] = '\0';
 
+            if (*cptr && *cptr != '/' && ii >= (int)sizeof(user) - 1)
+            {
+                return(FILE_NOT_OPENED); /* username too long to expand safely */
+            }
+
             /* get structure that includes name of user's home directory */
             pwd = getpwnam(user);
+
+            if (!pwd || !pwd->pw_dir)
+            {
+                return(FILE_NOT_OPENED); /* unknown user or missing home dir */
+            }
 
             /* copy user's home directory */
             if (strlen(pwd->pw_dir) + strlen(cptr) > 1023)
@@ -1137,4 +1147,3 @@ int stream_write(int hdl, void *buffer, long nbytes)
 
     return(0);
 }
-

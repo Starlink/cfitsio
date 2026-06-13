@@ -2,7 +2,7 @@
 \input{html.sty}
 \htmladdtonavigation
    {\begin{rawhtml}
- <A HREF="http://heasarc.gsfc.nasa.gov/docs/software/fitsio/fitsio.html">FITSIO Home</A>
+ <A HREF="https://heasarc.gsfc.nasa.gov/docs/software/fitsio/fitsio.html">FITSIO Home</A>
     \end{rawhtml}}
 %\oddsidemargin=0.25in
 \oddsidemargin=0.00in
@@ -32,7 +32,7 @@
 \medskip
 \medskip
 \begin{center}
-{\Large Version 4.6\\}
+{\Large Version 4.6.4\\}
 \end{center}
 \bigskip
 \vskip 2.5cm
@@ -47,7 +47,7 @@ USA}
 \vfill
 \bigskip
 \begin{center}
-{\Large Mar 2025\\}
+{\Large Apr 2026\\}
 \end{center}
 \vfill
 \end{titlepage}
@@ -93,25 +93,23 @@ contributions that resulted in many of the new features that appeared
 in v2.0 of CFITSIO.
 
 The latest version of the CFITSIO source code, documentation, and
-example programs are available on the World-Wide Web or via anonymous
-ftp from:
+example programs are available on the World-Wide Web from:
 
 \begin{verbatim}
-        http://heasarc.gsfc.nasa.gov/fitsio
-        ftp://legacy.gsfc.nasa.gov/software/fitsio/c
+        https://heasarc.gsfc.nasa.gov/docs/software/fitsio/
 \end{verbatim}
 \newpage
 Any questions, bug reports, or suggested enhancements related to the CFITSIO
 package should be sent to the FTOOLS Help Desk at the HEASARC:
 
 \begin{verbatim}
-        http://heasarc.gsfc.nasa.gov/cgi-bin/ftoolshelp
+        https://heasarc.gsfc.nasa.gov/cgi-bin/ftoolshelp
 \end{verbatim}
 
 This User's Guide assumes that readers already have a general
 understanding of the definition and structure of FITS format files.
 Further information about FITS formats is available from the FITS Support
-Office at {\tt http://fits.gsfc.nasa.gov}.  In particular, the
+Office at {\tt https://fits.gsfc.nasa.gov/}.  In particular, the
 'FITS Standard' gives the authoritative definition of the FITS data
 format.  Other documents available at that Web site
 provide additional historical background
@@ -127,8 +125,8 @@ that can be used to manipulate and analyze FITS format files.
 Fv and FTOOLS are available from their respective Web sites at:
 
 \begin{verbatim}
-        http://fv.gsfc.nasa.gov
-        http://heasarc.gsfc.nasa.gov/ftools
+        https://fv.gsfc.nasa.gov
+        https://heasarc.gsfc.nasa.gov/docs/software/ftools/
 \end{verbatim}
 
 
@@ -553,7 +551,7 @@ rely on the CFORTRAN macro developed by Burkhard Burow.
 The syntax used by CFITSIO for filtering or binning input FITS files is
 based on ideas developed for the AXAF Science Center Data Model by
 Jonathan McDowell, Antonella Fruscione, Aneta Siemiginowska and Bill
-Joye. See http://heasarc.gsfc.nasa.gov/docs/journal/axaf7.html for
+Joye. See https://heasarc.gsfc.nasa.gov/docs/journal/axaf7.html for
 further description of the AXAF Data Model.
 
 The file decompression code were taken directly from the gzip (GNU zip)
@@ -698,7 +696,7 @@ TFORMn -- the datatype of the column
 TUNITn -- the physical units of the column (optional)
 \end{itemize}
 
-Users should refer to the FITS Support Office at {\tt http://fits.gsfc.nasa.gov}
+Users should refer to the FITS Support Office at {\tt https://fits.gsfc.nasa.gov/}
 for further information about the FITS format and related software
 packages.
 
@@ -1234,10 +1232,10 @@ that this convention is being used, then the actual keyword name
 equals sign marks the end of the keyword name and is followed by the
 usual value and comment fields just as in standard FITS keywords.
 Further details of this convention are described at
-http://fits.gsfc.nasa.gov/registry/hierarch\_keyword.html
+https://fits.gsfc.nasa.gov/registry/hierarch\_keyword.html
 and in Section 4.4 of the ESO Data Interface Control Document that
 is linked to from
-http://archive.eso.org/cms/tools-documentation/eso-data-interface-control.html.
+https://archive.eso.org/cms/tools-documentation/eso-data-interface-control.html.
 
 This convention allows a broader range of keyword names
 than is allowed by the FITS Standard.  Here are more examples
@@ -4232,7 +4230,7 @@ external WCS library.  Several recommended libraries are:
 
 More information about the WCS keyword conventions and links to all of
 these WCS libraries can be found on the FITS Support Office web site at
-http://fits.gsfc.nasa.gov under the WCS link.
+https://fits.gsfc.nasa.gov under the WCS link.
 
 The functions provided in these external WCS libraries will need access to
 the  WCS information contained in the FITS file headers.  One convenient
@@ -5302,7 +5300,7 @@ This modified version is available in rootd subdirectory
 in the CFITSIO ftp area at
 
 \begin{verbatim}
-      ftp://legacy.gsfc.nasa.gov/software/fitsio/c/root/rootd.tar.gz.
+      https://heasarc.gsfc.nasa.gov/FTP/software/fitsio/c/root/rootd.tar.gz
 \end{verbatim}
 
 This small server is started either by inetd when a client requests a
@@ -6648,7 +6646,7 @@ usage. Also, the integer to real casts values to double precision:
     provided with these programs for more details on the syntax used in
     the region files.  The FITS region file format is defined in a document
     available from the FITS Support Office at
-    http://fits.gsfc.nasa.gov/ registry/ region.html
+    https://fits.gsfc.nasa.gov/registry/region.html
 
     In its simplest form, (e.g., regfilter("region.reg") ) the
     coordinates in the default 'X' and 'Y' columns will be used to

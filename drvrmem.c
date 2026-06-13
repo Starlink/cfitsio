@@ -282,10 +282,11 @@ int mem_truncate(int handle, LONGLONG filesize)
 
         *(memTable[handle].memaddrptr) = ptr;
         *(memTable[handle].memsizeptr) = (size_t) (filesize);
+
+        memTable[handle].currentpos = filesize;
+        memTable[handle].fitsfilesize = filesize;
     }
 
-    memTable[handle].currentpos = filesize;
-    memTable[handle].fitsfilesize = filesize;
     return(0);
 }
 /*--------------------------------------------------------------------------*/
@@ -616,7 +617,7 @@ int mem_compress_open(char *filename, int rwmode, int *hdl)
 	modulosize  = buffer[0];
 	modulosize |= buffer[1] << 8;
 	modulosize |= buffer[2] << 16;
-	modulosize |= buffer[3] << 24;
+	modulosize |= ((unsigned int)buffer[3]) << 24;
 
 /*
   the field ISIZE in the gzipped file header only stores 4 bytes and contains
@@ -664,7 +665,7 @@ int mem_compress_open(char *filename, int rwmode, int *hdl)
 	modulosize  = buffer[0];
 	modulosize |= buffer[1] << 8;
 	modulosize |= buffer[2] << 16;
-	modulosize |= buffer[3] << 24;
+	modulosize |= ((unsigned int)buffer[3]) << 24;
         finalsize = modulosize;
 
         estimated = 0;  /* file size is known, not estimated */

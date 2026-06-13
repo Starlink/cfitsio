@@ -3,7 +3,7 @@
 # Package name and version number:
 m4_define([v_maj], [4])
 m4_define([v_min], [6])
-m4_define([v_mic], [3])
+m4_define([v_mic], [4])
 m4_define([project_version], [v_maj.v_min.v_mic])
 AC_INIT([cfitsio], [project_version])
 #AC_INIT([cfitsio], [project_version], [ccfits@heasarc.gsfc.nasa.gov], [tarname], [url])
@@ -146,6 +146,13 @@ AC_ARG_ENABLE(
   [ if test $enableval = yes; then SSE_FLAGS="$SSE_FLAGS -mssse3"; fi ]
 )
 
+AC_ARG_ENABLE(
+  iterprogs,
+  [AS_HELP_STRING([--enable-iterprogs],[Build the programs that test the CFITSIO iterator function])],
+  [ if test $enableval = yes; then ITER_PROGS=yes; fi ]
+)
+AM_CONDITIONAL(BUILD_ITER, test x$ITER_PROGS = xyes)
+
 SYMBOLS=""
 AC_ARG_ENABLE(
   symbols,
@@ -264,8 +271,7 @@ if test "x$use_fortran" = "xyes"; then
   AC_MSG_NOTICE(cfitsio: == Adding Fortran wrappers)
   #AC_PROG_FC
   if test "x$FC" != "x" ; then F77=$FC; fi
-  AC_PROG_F77
-  #AC_CHECK_PROGS(FC, gfortran g95 g77 f77 ifort f95 f90 xlf cf77 gf77 af77 ncf f2c, notfound)
+  AC_PROG_F77([gfortran g95 g77 f77 ifort f95 f90 xlf cf77 gf77 af77 ncf f2c])
   if test "x$F77" != "x" ; then
      #FC_BASENAME=`basename $FC`
      FC_BASENAME=`basename $F77`

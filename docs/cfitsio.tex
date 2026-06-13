@@ -1,8 +1,9 @@
 \documentclass[11pt]{book}
-\input{html.sty}
+\usepackage[pdfauthor={NASA HEASARC},colorlinks=true,bookmarksopen,pdfkeywords={Flexible Image Transport System},pdfpagelayout=OneColumn]{hyperref}
+\usepackage{html}
 \htmladdtonavigation
    {\begin{rawhtml}
- <A HREF="http://heasarc.gsfc.nasa.gov/docs/software/fitsio/fitsio.html">FITSIO Home</A>
+ <A HREF="https://heasarc.gsfc.nasa.gov/docs/software/fitsio/fitsio.html">FITSIO Home</A>
     \end{rawhtml}}
 \oddsidemargin=0.00in
 \evensidemargin=0.00in
@@ -31,7 +32,7 @@
 \medskip
 \medskip
 \begin{center}
-{\Large Version 4.6 \\}
+{\Large Version 4.6.4\\}
 \end{center}
 \bigskip
 \vskip 2.5cm
@@ -46,7 +47,7 @@ USA}
 \vfill
 \bigskip
 \begin{center}
-{\Large Mar 2025\\}
+{\Large Apr 2026\\}
 \end{center}
 \vfill
 \end{titlepage}
@@ -97,24 +98,24 @@ in v2.0 of CFITSIO.
 
 The latest version of the CFITSIO source code,
 documentation, and example programs are available on the
-Web or via anonymous ftp from:
+Web:
 
 \begin{verbatim}
-        http://heasarc.gsfc.nasa.gov/fitsio
-        ftp://legacy.gsfc.nasa.gov/software/fitsio/c
+        https://heasarc.gsfc.nasa.gov/fitsio
+        https://heasarc.gsfc.nasa.gov/FTP/software/fitsio/c/
 \end{verbatim}
 
 Any questions, bug reports, or suggested enhancements related to the CFITSIO
 package should be sent to the FTOOLS Help Desk at the HEASARC:
 
 \begin{verbatim}
-        http://heasarc.gsfc.nasa.gov/cgi-bin/ftoolshelp
+        https://heasarc.gsfc.nasa.gov/cgi-bin/ftoolshelp
 \end{verbatim}
 
 This User's Guide assumes that readers already have a general
 understanding of the definition and structure of FITS format files.
 Further information about FITS formats is available from the FITS Support
-Office at {\tt http://fits.gsfc.nasa.gov}.  In particular, the
+Office at {\tt https://fits.gsfc.nasa.gov}.  In particular, the
 'FITS Standard' gives the authoritative definition of the FITS data
 format.  Other documents available at that Web site
 provide additional historical background
@@ -130,8 +131,8 @@ that can be used to manipulate and analyze FITS format files.
 Fv and FTOOLS are available from their respective Web sites at:
 
 \begin{verbatim}
-        http://fv.gsfc.nasa.gov
-        http://heasarc.gsfc.nasa.gov/ftools
+        https://fv.gsfc.nasa.gov
+        https://heasarc.gsfc.nasa.gov/docs/software/ftools/
 \end{verbatim}
 
 
@@ -185,7 +186,7 @@ rely on the CFORTRAN macro developed by Burkhard Burow.
 The syntax used by CFITSIO for filtering or binning input FITS files is
 based on ideas developed for the AXAF Science Center Data Model by
 Jonathan McDowell, Antonella Fruscione, Aneta Siemiginowska and Bill
-Joye. See http://heasarc.gsfc.nasa.gov/docs/journal/axaf7.html for
+Joye. See https://heasarc.gsfc.nasa.gov/docs/journal/axaf7.html for
 further description of the AXAF Data Model.
 
 The file decompression code were taken directly from the gzip (GNU zip)
@@ -274,7 +275,7 @@ The CFITSIO library is built on Unix systems by typing:
 \begin{verbatim}
  >  ./configure [--prefix=/target/installation/path] [--enable-reentrant]
                 [--enable-sse2] [--enable-ssse3]
- >  make          (or  'make shared')
+ >  make
  >  make install  (this step is optional)
 \end{verbatim}
 at the operating system prompt.  The configure command customizes the
@@ -319,12 +320,14 @@ externally compressed by the bzip2 algorithm.  This requires that the CFITSIO
 library, and all applications program that use CFITSIO, to be linked to include
 the libbz2 library.
 
-The 'make shared' option builds a shared or dynamic version of the
-CFITSIO library.  When using the shared library the executable code is
-not copied into your program at link time and instead the program
-locates the necessary library code at run time, normally through
-LD\_LIBRARY\_PATH or some other method. The advantages of using a shared
-library are:
+By default, both static and shared (dynamic) versions of the
+CFITSIO library are built.  To build only a static library, pass
+\verb+--disable-shared+ to configure; to build only a shared library,
+pass \verb+--disable-static+.  When using the shared library the
+executable code is not copied into your program at link time and
+instead the program locates the necessary library code at run time,
+normally through LD\_LIBRARY\_PATH or some other method.  The
+advantages of using a shared library are:
 
 \begin{verbatim}
    1.  Less disk space if you build more than 1 program
@@ -347,11 +350,10 @@ The disadvantages are:
       either really slow or really heavily loaded.
 \end{verbatim}
 
-On Mac OS X platforms the 'make shared' command works like on other
-UNIX platforms, but a .dylib file will be created instead of .so.  If
-installed in a nonstandard location, add its location to the
-DYLD\_LIBRARY\_PATH environment variable so that the library can be found
-at run time.
+On Mac OS X platforms, a .dylib file will be created instead of .so.
+If installed in a nonstandard location, add its location to the
+DYLD\_LIBRARY\_PATH environment variable so that the library can be
+found at run time.
 
 On HP/UX systems, the environment variable CFLAGS should be set
 to -Ae before running configure to enable "extended ANSI" features.
@@ -421,7 +423,7 @@ On Unix systems, type:
 \end{verbatim}
 The test program should produce a FITS file called `testprog.fit'
 that is identical to the `testprog.std' FITS file included with this
-release.  The diagnostic messages (which were piped to the file
+release.  The diagnostic messages (which were redirected to the file
 testprog.lis in the Unix example) should be identical to the listing
 contained in the file testprog.out.  The 'diff' and 'cmp' commands
 shown above should not report any differences in the files.  (There
@@ -451,7 +453,7 @@ zeros are not printed by default before the decimal point when using F
 format.
 
 A few other utility programs are included with CFITSIO; the first four
-of this programs can be compiled an linked by typing `make
+of these programs can be compiled and linked by typing `make
 program\_name' where `program\_name' is the actual name of the program:
 
 \begin{verbatim}
@@ -7862,7 +7864,7 @@ This modified version is available in rootd subdirectory
 in the CFITSIO ftp area at
 
 \begin{verbatim}
-      ftp://legacy.gsfc.nasa.gov/software/fitsio/c/root/rootd.tar.gz.
+      https://heasarc.gsfc.nasa.gov/FTP/software/fitsio/c/root/rootd.tar.gz
 \end{verbatim}
 
 This small server is started either by inetd when a client requests a
